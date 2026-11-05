@@ -38,7 +38,7 @@ class LocalUsageTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.home = Path(self.temp.name)
+        self.home = Path(self.temp.name).resolve()
         CODEX_INDEX.entries.clear()
         CLAUDE_INDEX.entries.clear()
 
