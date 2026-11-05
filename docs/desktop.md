@@ -9,6 +9,9 @@ The existing local dashboard is rendered inside the application window. Its
 authenticated loopback backend runs in the same application process. Closing
 the window stops that backend. A second launch activates the existing window.
 An explicitly clicked external source link can open the default browser.
+On opening the overview, the page scrolls to Codex quota as soon as local data
+arrives. This happens once; scrolling manually cancels it, and later refreshes
+do not move the view back. An explicit Radar link keeps its own target.
 
 Account collection remains local-only. Isambard and Radar still fetch public
 information. Version 0.4 uses [event accounting and unified time ranges](local-usage.md).

@@ -10,7 +10,7 @@ __REFRESH_SCRIPT__
       pendingRefresh: false,
       pendingForceRefresh: false,
       lastPayload: null,
-      initialPanelPositionPending: window.location.hash === "#codex-radar",
+      initialPanelPositionPending: !window.location.hash || window.location.hash === "#codex-radar",
       lang: localStorage.getItem("pulsedeckLanguage") || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en")
     };
 
@@ -693,11 +693,14 @@ __USAGE_SCRIPT__
 
     function positionInitialPanel(report) {
       if (!state.initialPanelPositionPending) return;
+      if (window.location.hash === "#codex-radar" && state.lastPayload?.pending?.length) return;
       if (!["all", "codex-usage"].includes(report)) {
         state.initialPanelPositionPending = false;
         return;
       }
-      const target = document.getElementById("codex-radar");
+      const target = window.location.hash === "#codex-radar"
+        ? document.getElementById("codex-radar")
+        : document.querySelector('[data-panel-id="codex-rate"]');
       if (!target) return;
       const disclosure = target.closest("details");
       if (disclosure) disclosure.open = true;
@@ -781,11 +784,11 @@ __USAGE_SCRIPT__
           }
           state.lastPayload = payload;
           render(payload, sameReport);
+          positionInitialPanel(report);
           if (payload.pending.length) {
             setStatus(t("refreshing"), `${t("loadingSources")}: ${payload.pending.length}`);
           } else {
             setStatus(payload.ok ? t("upToDate") : t("loadedWithNotes"), `${t("lastRefresh")} ${new Date().toLocaleTimeString()}`);
-            positionInitialPanel(report);
           }
         });
       } catch (error) {
