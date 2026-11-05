@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 import urllib.parse
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable
 
@@ -25,6 +26,7 @@ from pathlib import Path
 from usage_common import CollectionError, cache_directory
 from usage_sources import SOURCES, SourceCache, check_environment, resolve_sources
 from dashboard_assets import asset_text, load_page
+from pulsedeck.local_usage import make_scope
 import codex_usage
 import claude_usage
 import isambard_status
@@ -244,7 +246,7 @@ INDEX_HTML = load_page("index")
 
 INDEX_HTML = INDEX_HTML.replace("__RADAR_STYLE__", codex_radar.STYLE).replace(
     "__RADAR_SCRIPT__", codex_radar.SCRIPT
-).replace("__REFRESH_SCRIPT__", asset_text("static/refresh.js"))
+).replace("__REFRESH_SCRIPT__", asset_text("static/refresh.js")).replace("__USAGE_SCRIPT__", asset_text("static/usage.js"))
 
 
 MAINTENANCE_HTML = load_page("maintenance")
@@ -312,21 +314,24 @@ def collect_report(
     limit: int | None, group_by: list[str], no_costs: bool,
     isambard_force_refresh: bool, *, enabled_sources: frozenset[str] = SOURCES,
     source_cache: SourceCache | None = None, cache_dir: Path | None = None,
+    range_name: str = "all", range_anchor: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Compose reports from the same source collectors used by progressive UI requests."""
+    range_anchor = range_anchor or date.today().isoformat()
     api_args = argparse.Namespace(days=days, top=top, bucket_width=bucket_width,
                                   limit=limit, group_by=group_by, no_costs=no_costs)
     def local() -> dict[str, Any]:
-        result = codex_usage.collect_local_usage(codex_usage.CODEX_HOME, top_n=top)
-        codex_usage.limit_local_usage_days(result, days)
-        return result
+        return codex_usage.collect_local_usage(codex_usage.CODEX_HOME, top_n=top,
+                                              range_name=range_name, anchor=range_anchor)
 
     # name -> source, TTL, cache parameters, collector
     collectors = {
         "reset_credits": ("codex", 60, (), codex_usage.collect_resets),
-        "local_usage": ("codex", 5, (top, days), local),
+        "local_usage": ("codex", 5, (top, range_name, range_anchor or date.today().isoformat()), local),
         "online_usage": ("codex", 60, (), codex_usage.collect_online_usage),
-        "claude_usage": ("claude", 15, (top, days), lambda: claude_usage.collect_usage(top_n=top, days=days)),
+        "claude_usage": ("claude", 5, (top, range_name, range_anchor or date.today().isoformat()),
+                         lambda: claude_usage.collect_usage(top_n=top, days=days,
+                                                           range_name=range_name, anchor=range_anchor)),
         "isambard_status": ("isambard", 30, (), lambda: isambard_status.collect_status(
             cache_path=(cache_dir or cache_directory()) / "isambard_status_snapshot.json",
             force_refresh=isambard_force_refresh)),
@@ -597,7 +602,8 @@ class UsageWebHandler(BaseHTTPRequestHandler):
 
     def source_settings(self) -> dict[str, Any]:
         with self.server.sources_lock:
-            return {"sources": sorted(self.server.enabled_sources), "accountNetworkEnabled": False}
+            return {"sources": sorted(self.server.enabled_sources), "accountNetworkEnabled": False,
+                    "localDate": date.today().isoformat()}
 
     def radar_snapshot(self) -> dict[str, Any]:
         with self.server.sources_lock:
@@ -665,6 +671,14 @@ class UsageWebHandler(BaseHTTPRequestHandler):
 
     def send_usage(self, raw_query: str, *, allow_force_refresh: bool = False) -> None:
         query = urllib.parse.parse_qs(raw_query)
+        try:
+            scope = make_scope(query.get("range", ["30d"])[0], query.get("range_anchor", [None])[0])
+            scope.start  # Validate subtraction near the earliest representable date.
+            if scope.anchor > date.today():
+                raise ValueError("range_anchor cannot be in the future")
+        except (ValueError, OverflowError) as exc:
+            self.send_json({"ok": False, "error": str(exc)}, status=400)
+            return
         report = query.get("report", ["all"])[0]
         top = positive_int_query(query, "top", 10, 1, MAX_TOP)
         days = positive_int_query(query, "days", getattr(self.server, "local_days", DEFAULT_DAYS), 1, MAX_DAYS)
@@ -708,6 +722,8 @@ class UsageWebHandler(BaseHTTPRequestHandler):
             report,
             top,
             days,
+            scope.name,
+            scope.anchor.isoformat(),
             warn_days,
             bucket_width,
             limit,
@@ -731,6 +747,8 @@ class UsageWebHandler(BaseHTTPRequestHandler):
                     enabled_sources=enabled_sources,
                     source_cache=self.server.source_cache,
                     cache_dir=self.server.cache_dir,
+                    range_name=scope.name,
+                    range_anchor=scope.anchor.isoformat(),
                 ),
                 force_refresh=isambard_force_refresh,
             )
@@ -746,6 +764,7 @@ class UsageWebHandler(BaseHTTPRequestHandler):
             "report": report,
             "served_at_local": codex_usage.local_now_text(),
             "settings": {
+                "scope": scope.as_dict(),
                 "top": top,
                 "days": days,
                 "warn_days": warn_days,

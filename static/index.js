@@ -20,7 +20,7 @@ __REFRESH_SCRIPT__
       en: {
         moduleUsage: "Usage", moduleStatus: "Service status", moduleScores: "Model scores",
         appTitle: "PulseDeck",
-        subtitle: "Local AI usage and captured snapshots. Isambard and Radar use public sources.",
+        subtitle: "Local usage, service status, and model intelligence.",
         sourceDisabled: "Not enabled",
         setupSources: "No local sources detected. Sign in to Codex or Claude Code, then restart the dashboard. Use --check for setup diagnostics.",
         loadingSources: "Loading sources",
@@ -36,7 +36,7 @@ __REFRESH_SCRIPT__
         autoRefresh: "Auto Refresh",
         refresh: "Refresh",
         refreshing: "Refreshing",
-        refreshingDetail: "Reading Codex, Claude Code, and selected online endpoints.",
+        refreshingDetail: "Reading local usage and public status snapshots.",
         upToDate: "Up to Date",
         loadedWithNotes: "Loaded With Notes",
         lastRefresh: "Last Refresh",
@@ -201,7 +201,7 @@ __REFRESH_SCRIPT__
         autoRefresh: "自动刷新",
         refresh: "刷新",
         refreshing: "刷新中",
-        refreshingDetail: "正在读取 Codex、Claude Code 和选中的在线接口。",
+        refreshingDetail: "正在读取本地用量和公共状态快照。",
         upToDate: "已更新",
         loadedWithNotes: "已加载，有提示",
         lastRefresh: "上次刷新",
@@ -348,6 +348,8 @@ __REFRESH_SCRIPT__
         unknown: "未知"
       }
     };
+
+__USAGE_SCRIPT__
 
     function t(key) {
       return TEXT[state.lang]?.[key] || TEXT.en[key] || key;
@@ -695,78 +697,6 @@ __REFRESH_SCRIPT__
       return next;
     }
 
-    function heatLevel(total, maxTotal) {
-      const value = asNumber(total) || 0;
-      if (value <= 0 || !maxTotal) {
-        return 0;
-      }
-      const ratio = value / maxTotal;
-      if (ratio <= 0.25) {
-        return 1;
-      }
-      if (ratio <= 0.5) {
-        return 2;
-      }
-      if (ratio <= 0.75) {
-        return 3;
-      }
-      return 4;
-    }
-
-    function dailyHeatmap(daily) {
-      if (!Array.isArray(daily) || daily.length === 0) {
-        return `<div class="empty">${esc(t("noDailyRows"))}</div>`;
-      }
-      const rows = daily
-        .filter((row) => parseLocalDate(row.date))
-        .sort((a, b) => parseLocalDate(a.date) - parseLocalDate(b.date));
-      if (rows.length === 0) {
-        return `<div class="empty">${esc(t("noDailyRows"))}</div>`;
-      }
-      const byDate = new Map(rows.map((row) => [row.date, row]));
-      const totals = rows.map((row) => asNumber(row.total_tokens) || 0);
-      const maxTotal = Math.max(...totals, 0);
-      const totalTokens = totals.reduce((sum, value) => sum + value, 0);
-      const busiest = rows.reduce((best, row) => {
-        const current = asNumber(row.total_tokens) || 0;
-        const previous = asNumber(best.total_tokens) || 0;
-        return current > previous ? row : best;
-      }, rows[0]);
-      const start = parseLocalDate(rows[0].date);
-      const end = parseLocalDate(rows[rows.length - 1].date);
-      const cells = [];
-      for (let i = 0; i < start.getDay(); i += 1) {
-        cells.push(`<span class="heat-cell blank" aria-hidden="true"></span>`);
-      }
-      for (let day = start; day <= end; day = addDays(day, 1)) {
-        const key = dateKey(day);
-        const row = byDate.get(key) || { date: key, sessions: 0, total_tokens: 0 };
-        const total = asNumber(row.total_tokens) || 0;
-        const level = heatLevel(total, maxTotal);
-        const title = `${key}: ${fmtNumber(total)} ${t("totalTokens")}, ${fmtNumber(row.sessions || 0)} ${t("sessions")}`;
-        cells.push(`<span class="heat-cell heat-${level}" title="${esc(title)}" aria-label="${esc(title)}"></span>`);
-      }
-      return `
-        <div class="heatmap-wrap">
-          <div class="heatmap-meta">
-            <span>${esc(fmtNumber(totalTokens))} ${esc(t("totalTokensWindow"))}</span>
-            <span>${esc(t("busiestDay"))}: ${esc(busiest.date || "-")} (${esc(fmtNumber(busiest.total_tokens))})</span>
-          </div>
-          <div class="heatmap-scroll">
-            <div class="heatmap-grid">${cells.join("")}</div>
-          </div>
-          <div class="heatmap-legend">
-            <span>${esc(t("less"))}</span>
-            <span class="heat-cell heat-0"></span>
-            <span class="heat-cell heat-1"></span>
-            <span class="heat-cell heat-2"></span>
-            <span class="heat-cell heat-3"></span>
-            <span class="heat-cell heat-4"></span>
-            <span>${esc(t("more"))}</span>
-          </div>
-        </div>`;
-    }
-
     const MODEL_COLORS = [
       "#55d486",
       "#46d3b8",
@@ -793,44 +723,6 @@ __REFRESH_SCRIPT__
         </span>`;
     }
 
-    function sqliteModelStack(sqliteModels, changePrefix) {
-      if (!Array.isArray(sqliteModels) || sqliteModels.length === 0) {
-        return "";
-      }
-      const rows = sqliteModels.map((row, index) => ({
-        model: row.model || "-",
-        tokens: asNumber(row.tokens_used) || 0,
-        color: modelColor(index)
-      }));
-      const total = rows.reduce((sum, row) => sum + row.tokens, 0);
-      if (total <= 0) {
-        return "";
-      }
-      const segments = rows.map((row) => {
-        const share = row.tokens / total * 100;
-        const title = `${row.model}: ${fmtNumber(row.tokens)} ${t("tokensUsed")} (${fmtPercent(share)})`;
-        return `<span class="sqlite-stack-segment" style="width: ${share}%; background: ${row.color}" title="${esc(title)}" aria-label="${esc(title)}"></span>`;
-      }).join("");
-      return `
-        <div class="sqlite-stack">
-          <div class="sqlite-stack-meta">
-            <span>${trackedNumber(`${changePrefix}.total`, total)} ${esc(t("tokensUsed"))}</span>
-            <span>${trackedNumber(`${changePrefix}.count`, rows.length)} ${esc(t("models"))}</span>
-          </div>
-          <div class="sqlite-stack-bar">${segments}</div>
-        </div>`;
-    }
-
-    function modelTokenStack(rows) {
-      if (!Array.isArray(rows)) {
-        return "";
-      }
-      return sqliteModelStack(rows.map((row) => ({
-        model: row.model || "-",
-        tokens_used: asNumber(row.total_tokens) || 0
-      })), "claude.models");
-    }
-
     function splitSections(data, report) {
       return {
         resets: ["all", "codex-usage"].includes(report) ? data?.reset_credits : (report === "resets" ? data : null),
@@ -846,6 +738,7 @@ __REFRESH_SCRIPT__
       return {
         input_tokens: t("inputTokens"),
         cached_input_tokens: t("cachedInputTokens"),
+        cache_write_input_tokens: t("cacheWriteTokens"),
         output_tokens: t("outputTokens"),
         reasoning_output_tokens: t("reasoningOutputTokens"),
         cache_creation_input_tokens: t("cacheCreationTokens"),
@@ -880,50 +773,8 @@ __REFRESH_SCRIPT__
       return [panel(t("resetCredits"), t("resetSubtitle"), credits, true, "codex-resets", headerExtras)];
     }
 
-    function renderLocal(local, showDetailsLink = false) {
-      if (!local) {
-        return [];
-      }
-      const sessions = local.sessions || {};
-      const totals = sessions.final_token_totals_sum || {};
-      const daily = Array.isArray(sessions.daily_usage) ? sessions.daily_usage : [];
-      const topSessions = Array.isArray(sessions.top_sessions_by_total_tokens) ? sessions.top_sessions_by_total_tokens : [];
-      const sqliteModels = get(local, ["sqlite_threads", "selected", "by_model"], []);
-      const sqliteModelsUpdatedAt = get(local, ["sqlite_threads", "selected", "updated_at_unix_ms"]);
-
-      const tokenRows = ["input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"]
-        .map((field) => [esc(usageFieldLabel(field)), esc(fmtNumber(totals[field]))]);
-      const topRows = topSessions.map((item) => [
-        esc(item.date || "-"),
-        esc(item.model || "-"),
-        esc(fmtNumber(get(item, ["usage", "total_tokens"]))),
-        esc(fmtNumber(get(item, ["usage", "output_tokens"]))),
-        esc(item.project || "-"),
-        `<span class="mono">${esc(item.session_file || "-")}</span>`
-      ]);
-      const sqliteTotal = Array.isArray(sqliteModels)
-        ? sqliteModels.reduce((sum, row) => sum + (asNumber(row.tokens_used) || 0), 0)
-        : 0;
-      const sqliteRows = Array.isArray(sqliteModels) ? sqliteModels.map((row, index) => [
-        sqliteModelKey(row.model || "-", index),
-        trackedModelNumber("codex", row.model, "threads", row.threads),
-        trackedModelNumber("codex", row.model, "tokens", row.tokens_used),
-        trackedModelNumber("codex", row.model, "share", sqliteTotal > 0 ? (asNumber(row.tokens_used) || 0) / sqliteTotal * 100 : null,
-          fmtPercent(sqliteTotal > 0 ? (asNumber(row.tokens_used) || 0) / sqliteTotal * 100 : null))
-      ]) : [];
-      const detailsLink = showDetailsLink
-        ? `<a class="detail-link" href="/?report=codex-usage">${esc(t("viewCodexDetails"))}</a>`
-        : "";
-      const modelHeaderExtras = asNumber(sqliteModelsUpdatedAt) !== null
-        ? [{ label: t("updated"), value: fmtAgeSince(sqliteModelsUpdatedAt) }]
-        : [];
-
-      return [
-        panel(t("localTokenTotals"), t("localTokenSubtitle"), table([t("field"), t("total")], tokenRows, [1]), false, "codex-totals"),
-        panel(t("sqliteModelCounters"), t("sqliteSubtitle"), sqliteModelStack(sqliteModels, "codex.models") + table([t("model"), t("threads"), t("tokensUsed"), t("share")], sqliteRows, [1, 2, 3], "sqlite-table") + detailsLink, false, "codex-models", modelHeaderExtras),
-        panel(t("dailyLocalUsage"), `${daily.length} ${t("dayWindow")}`, dailyHeatmap(daily), false, "daily"),
-        panel(t("topSessions"), t("topSessionsSubtitle"), table([t("date"), t("model"), t("total"), t("output"), t("project"), t("sessionFile")], topRows, [2, 3]), true, "codex-sessions")
-      ];
+    function renderLocal(local, overview = false) {
+      return local?.usage ? renderUsage(local.usage, "codex", overview) : [];
     }
 
     function renderOnline(online) {
@@ -967,7 +818,7 @@ __REFRESH_SCRIPT__
         return [];
       }
       const rate = claude.rate_limits || {};
-      const local = claude.local_usage || {};
+      if (showDetailsLink) return renderUsage(claude.local_usage, "claude", true);
       const fiveHour = rate.five_hour || null;
       const sevenDay = rate.seven_day || null;
       const authStatus = rate.auth_status || {};
@@ -1022,61 +873,8 @@ __REFRESH_SCRIPT__
       const sevenDayReset = `${t("resetsIn")} ${fmtDurationSeconds(sevenDay?.reset_after_seconds)}`;
       const bars = `<div class="bars">${leftBar(t("claudeFiveHour"), fiveHour?.used_percentage, t("claudeFiveHourHint"), fiveHourReset, "claude.primary.remaining")}${leftBar(t("claudeWeekly"), sevenDay?.used_percentage, t("claudeWeeklyHint"), sevenDayReset, "claude.weekly.remaining")}</div>`;
 
-      const totals = local.token_totals || {};
-      const tokenRows = ["input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "total_tokens"]
-        .map((field) => [esc(usageFieldLabel(field)), esc(fmtNumber(totals[field]))]);
-      const localMeta = kvGrid([
-        [esc(t("uniqueRequests")), esc(fmtNumber(local.unique_usage_records))],
-        [esc(t("sessions")), esc(fmtNumber(local.session_files))],
-        [esc(t("duplicateRowsSkipped")), esc(fmtNumber(local.duplicate_usage_records_skipped))]
-      ]);
-
-      const models = Array.isArray(local.by_model) ? local.by_model : [];
-      const modelsUpdatedAt = local.latest_record_at_unix_ms;
-      const modelTotal = models.reduce((sum, row) => sum + (asNumber(row.total_tokens) || 0), 0);
-      const modelRows = models.map((row, index) => [
-        sqliteModelKey(row.model || "-", index),
-        trackedModelNumber("claude", row.model, "requests", row.requests),
-        trackedModelNumber("claude", row.model, "tokens", row.total_tokens),
-        trackedModelNumber("claude", row.model, "share", modelTotal > 0 ? (asNumber(row.total_tokens) || 0) / modelTotal * 100 : null,
-          fmtPercent(modelTotal > 0 ? (asNumber(row.total_tokens) || 0) / modelTotal * 100 : null))
-      ]);
-
-      const projects = Array.isArray(local.by_project) ? local.by_project : [];
-      const projectRows = projects.map((row) => [
-        `<span class="mono">${esc(row.project || "-")}</span>`,
-        esc(fmtNumber(row.requests)),
-        esc(fmtNumber(row.input_tokens)),
-        esc(fmtNumber(row.output_tokens)),
-        esc(fmtNumber(row.total_tokens))
-      ]);
-
-      const daily = Array.isArray(local.daily_usage) ? local.daily_usage : [];
-      const topSessions = Array.isArray(local.top_sessions) ? local.top_sessions : [];
-      const topRows = topSessions.map((item) => [
-        esc(item.date || "-"),
-        esc(Array.isArray(item.models) ? item.models.join(", ") : "-"),
-        esc(fmtNumber(item.requests)),
-        esc(fmtNumber(get(item, ["usage", "total_tokens"]))),
-        esc(fmtNumber(get(item, ["usage", "output_tokens"]))),
-        esc(item.project || "-"),
-        `<span class="mono">${esc(item.session_file || "-")}</span>`
-      ]);
-      const detailsLink = showDetailsLink
-        ? `<a class="detail-link" href="/?report=claude-usage">${esc(t("viewClaudeDetails"))}</a>`
-        : "";
-      const modelHeaderExtras = asNumber(modelsUpdatedAt) !== null
-        ? [{ label: t("updated"), value: fmtAgeSince(modelsUpdatedAt) }]
-        : [];
-
-      return [
-        panel(t("claudeRateLimits"), t("claudeRateSubtitle"), bars + loginWarning + setup, true, "claude-rate", headerExtras),
-        panel(t("claudeLocalTokens"), t("claudeLocalSubtitle"), localMeta + table([t("field"), t("total")], tokenRows, [1]), false, "claude-totals"),
-        panel(t("claudeModels"), t("claudeModelsSubtitle"), modelTokenStack(models) + table([t("model"), t("requests"), t("total"), t("share")], modelRows, [1, 2, 3]) + detailsLink, false, "claude-models", modelHeaderExtras),
-        panel(t("claudeDailyUsage"), `${daily.length} ${t("dayWindow")}`, dailyHeatmap(daily), false, "claude-daily"),
-        panel(t("claudeProjects"), t("claudeProjectsSubtitle"), table([t("project"), t("requests"), t("input"), t("output"), t("total")], projectRows, [1, 2, 3, 4]), true, "claude-projects"),
-        panel(t("claudeTopSessions"), t("claudeTopSessionsSubtitle"), table([t("date"), t("model"), t("requests"), t("total"), t("output"), t("project"), t("sessionFile")], topRows, [2, 3, 4]), true, "claude-sessions")
-      ];
+      const quota = panel(t("claudeRateLimits"), t("currentSnapshot"), bars + loginWarning + setup, true, "claude-rate", headerExtras);
+      return [...renderUsage(claude.local_usage, "claude"), collapsePanel(quota, "claude-quota", t("claudeRateLimits"))];
     }
 
     function renderApiUsage(api) {
@@ -1229,69 +1027,31 @@ __REFRESH_SCRIPT__
       }
       showNotice(warnings);
 
-      const onlinePanels = renderOnline(sections.online);
-      const localPanels = renderLocal(sections.local, report === "all");
-      const claudePanels = renderClaude(sections.claude, report === "all");
-      const profilePanelIndex = onlinePanels.findIndex((p) => p.title === "profile");
-      const dailyPanelIndex = localPanels.findIndex((p) => p.title === "daily");
-      const claudeRatePanelIndex = claudePanels.findIndex((p) => p.title === "claude-rate");
-      const profilePanel = profilePanelIndex >= 0 ? onlinePanels.splice(profilePanelIndex, 1)[0] : null;
-      const dailyPanel = dailyPanelIndex >= 0 ? localPanels.splice(dailyPanelIndex, 1)[0] : null;
-      const claudeRatePanel = claudeRatePanelIndex >= 0 ? claudePanels.splice(claudeRatePanelIndex, 1)[0] : null;
-      const claudeModelPanelIndex = claudePanels.findIndex((p) => p.title === "claude-models");
-      const codexModelPanelIndex = localPanels.findIndex((p) => p.title === "codex-models");
-      const claudeModelPanel = claudeModelPanelIndex >= 0 ? claudePanels.splice(claudeModelPanelIndex, 1)[0] : null;
-      const codexModelPanel = codexModelPanelIndex >= 0 ? localPanels.splice(codexModelPanelIndex, 1)[0] : null;
-      const modelPanels = [claudeModelPanel, codexModelPanel].filter(Boolean);
-      const claudeDetailPanelIds = new Set([
-        "claude-totals",
-        "claude-daily",
-        "claude-projects",
-        "claude-sessions"
-      ]);
-      const visibleClaudePanels = report === "all"
-        ? claudePanels.filter((panel) => !claudeDetailPanelIds.has(panel.title))
-        : claudePanels;
-      const codexDetailPanelIds = new Set(["codex-totals", "codex-sessions"]);
-      const visibleLocalPanels = report === "all"
-        ? localPanels.filter((panel) => !codexDetailPanelIds.has(panel.title))
-        : localPanels;
-      const pairedPanels = report === "all" ? [] : [profilePanel, dailyPanel].filter(Boolean);
+      const overview = report === "all";
       const loadingPanels = (payload.pending || []).filter(name => !data[name] && (name !== "isambard_status" || dashboardConfig.sources.includes("isambard"))).map(name => panel(
-        t({local_usage: "dailyLocalUsage", claude_usage: "claudeRateLimits",
-           online_usage: "onlineRateLimits", reset_credits: "resetCredits",
-           isambard_status: "isambardStatus", api_usage: "adminApi"}[name]), t("loadingSources"),
-        `<div class="empty" role="status">${esc(t("refreshing"))}…</div>`, true, `loading-${name}`));
+        {local_usage:"Codex", claude_usage:"Claude Code", isambard_status:"Isambard"}[name] || name,
+        t("loadingSources"), `<div class="empty" role="status">${esc(t("refreshing"))}…</div>`, false, `loading-${name}`));
       const disabledPanels = [...new Set(disabled)].map(source => panel(
         source === "claude" ? "Claude Code" : source === "codex" ? "Codex" : "Isambard",
         t("sourceDisabled"), `<div class="empty">${esc(t("sourceDisabled"))}</div>`, false, `disabled-${source}`));
-      if (!dashboardConfig.sources.length) {
-        disabledPanels.splice(0, disabledPanels.length, panel(t("sourceDisabled"), "",
-          `<div class="empty">${esc(t("setupSources"))}</div>`, true, "setup"));
-      }
+      const radar = dashboardConfig.sources.includes("radar") && ["all", "codex-usage"].includes(report)
+        ? panel(CodexRadar.title(state.lang), CodexRadar.subtitle(state.lang), '<div id="codex-radar"></div>', true, "codex-radar-panel",
+            [{label:t("updated"),valueHtml:'<span data-radar-age>—</span>'}]) : null;
       const panels = [
-        ...loadingPanels,
-        ...disabledPanels,
-        ...onlinePanels,
-        claudeRatePanel,
-        ...renderIsambard(sections.isambard),
-        ...modelPanels,
-        ...visibleClaudePanels,
-        ...pairedPanels,
-        ...renderResets(sections.resets),
-        ...(dashboardConfig.sources.includes("radar") && ["all", "codex-usage"].includes(report)
-          ? [panel(CodexRadar.title(state.lang), CodexRadar.subtitle(state.lang),
-              '<div id="codex-radar"></div>', true, "codex-radar-panel",
-              [{ label: t("updated"), valueHtml: '<span data-radar-age>—</span>' }])]
-          : []),
-        ...visibleLocalPanels,
-        ...renderApiUsage(sections.api)
+        ...renderLocal(sections.local, overview), ...renderClaude(sections.claude, overview),
+        ...loadingPanels, ...disabledPanels, ...renderIsambard(sections.isambard),
+        collapsePanel(radar, "radar-details", "Radar · " + t("moduleScores"))
       ];
+      const expanded = new Set([...document.querySelectorAll("[data-disclosure][open]")].map(node => node.dataset.disclosure));
       const radarRoot = document.getElementById("codex-radar");
       const radarFocus = radarRoot?.contains(document.activeElement) ? document.activeElement : null;
       $("sections").innerHTML = packSections(panels);
       const radarPlaceholder = document.getElementById("codex-radar");
       if (radarRoot && radarPlaceholder) radarPlaceholder.replaceWith(radarRoot);
+      document.querySelectorAll("[data-disclosure]").forEach(node => { node.open = expanded.has(node.dataset.disclosure); });
+      $("scope-note").textContent = t("rangePublicNote");
+      $("local-policy").textContent = t("localPolicy");
+      $("quota-note").textContent = t("quotaNote");
       if (radarPlaceholder) radarFocus?.focus({preventScroll: true});
       CodexRadar.mount(document.getElementById("codex-radar"), state.lang, fmtAgeSince);
       const hasRateLimits = Boolean(document.querySelector('[data-panel-id="codex-rate"]'));
@@ -1308,6 +1068,8 @@ __REFRESH_SCRIPT__
       }
       const target = document.getElementById("codex-radar");
       if (!target) return;
+      const disclosure = target.closest("details");
+      if (disclosure) disclosure.open = true;
       requestAnimationFrame(() => {
         if (!state.initialPanelPositionPending || !target.isConnected) return;
         state.initialPanelPositionPending = false;
@@ -1360,10 +1122,11 @@ __REFRESH_SCRIPT__
       state.timer = null;
       const report = $("report").value;
       const days = String(dashboardConfig.days);
+      const range = $("time-range").value;
       const revision = state.sourceRevision;
       const controller = new AbortController();
       state.refreshController = controller;
-      const sameReport = state.lastPayload?.report === report;
+      let sameReport = state.lastPayload?.report === report && state.lastPayload?.range === range;
       state.loading = true;
       $("refresh-now").disabled = true;
       $("sections").setAttribute("aria-busy", "true");
@@ -1374,10 +1137,11 @@ __REFRESH_SCRIPT__
         const sourceSettings = await sourceResponse.json();
         if (revision !== state.sourceRevision) return;
         applySourceSettings(sourceSettings);
-        await DashboardRefresh.run({report, days, sources: dashboardConfig.sources,
+        sameReport = sameReport && state.lastPayload?.rangeAnchor === sourceSettings.localDate;
+        await DashboardRefresh.run({report, days, range, rangeAnchor:sourceSettings.localDate, sources: dashboardConfig.sources,
           adminEnabled: dashboardConfig.adminEnabled, accountNetworkEnabled: dashboardConfig.accountNetworkEnabled, force: forceIsambardRefresh === true, signal: controller.signal}, payload => {
           // A result from the previous selection must never overwrite the new view.
-          if ($("report").value !== report || revision !== state.sourceRevision || controller.signal.aborted) return;
+          if ($("report").value !== report || $("time-range").value !== range || revision !== state.sourceRevision || controller.signal.aborted) return;
           // Preserve completed sections during a refresh, replacing each as it arrives.
           if (sameReport && payload.pending.length) {
             payload.data = ["all", "codex-usage"].includes(report)
@@ -1433,10 +1197,19 @@ __REFRESH_SCRIPT__
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
       });
     });
-    $("report").addEventListener("change", () => {
+    function changeView() {
       state.initialPanelPositionPending = false;
+      state.sourceRevision++;
+      state.refreshController?.abort();
+      state.lastPayload = null;
+      $("sections").replaceChildren();
+      localStorage.setItem("pulsedeckRange", $("time-range").value);
+      const params = new URLSearchParams({report:$("report").value, range:$("time-range").value});
+      history.replaceState(null, "", `/?${params}`);
       refresh();
-    });
+    }
+    $("report").addEventListener("change", changeView);
+    $("time-range").addEventListener("change", changeView);
     $("isambard-enabled").addEventListener("change", event => toggleSource("isambard", event.target.checked));
     $("radar-enabled").addEventListener("change", event => toggleSource("radar", event.target.checked));
     $("auto").addEventListener("change", schedule);
@@ -1457,6 +1230,8 @@ __REFRESH_SCRIPT__
       }
     });
 
+    const requestedRange = new URLSearchParams(window.location.search).get("range") || localStorage.getItem("pulsedeckRange") || "30d";
+    $("time-range").value = ["today", "7d", "30d", "all"].includes(requestedRange) ? requestedRange : "30d";
     const requestedReport = new URLSearchParams(window.location.search).get("report") || dashboardConfig.defaultReport;
     if (requestedReport && Array.from($("report").options).some((option) => option.value === requestedReport)) {
       $("report").value = requestedReport;

@@ -21,7 +21,7 @@ python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache --check
 | `--cache-dir` | Public-source disk cache directory; 公共来源缓存目录 |
 | `--port 8766` | Change the default port 8765; 修改端口 |
 | `--refresh 30` | Browser interval (default 15 seconds), local configuration only; 仅本地配置 |
-| `--days 60` | Local daily rows (default 30, maximum 365), local configuration only; 仅本地配置 |
+| `--days 60` | Legacy request setting; dashboard local history now uses the Time range selector |
 | `--quiet` | Disable per-request access logs; 关闭访问日志 |
 | `--max-workers` | Simultaneous HTTP requests, default 4 |
 | `--max-collectors` | Simultaneous report collections, default 2 |
@@ -29,20 +29,19 @@ python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache --check
 
 The page URL can override the default view with `?report=claude-usage` after
 sign-in. Disabled sources return `disabled: true` and never run collectors.
-An optional Admin API section appears only when `OPENAI_ADMIN_KEY` is configured
-and Codex is enabled. Browser language is saved locally.
+Account-network reports are disabled, including Admin API even when a key is configured.
+Browser language and time range are saved locally.
 
 首次认证后可用 `?report=claude-usage` 指定视图。关闭的来源不会执行采集。
 默认自动检测的结果在重启服务时更新；安装或登录新客户端后请重启。
 
-Toolbar: Report (Overview by default), Language, Isambard Status, Codex Radar, Auto Refresh and Refresh.
+Toolbar: Report (Overview by default), Time range, Language, Isambard Status, Codex Radar, Auto Refresh and Refresh.
 The two public sources are checked by default. Switching one off hides its panel and stops new
 collection work; Radar's background worker pauses. An already-running fetch may finish.
 The switches are shared by this server's tabs, synchronized on refresh, and reset to the startup
 selection when the server restarts. Explicit `--sources` selections determine initial checkboxes.
 
-工具栏保留 Report／语言／自动刷新／刷新，并加入默认勾选的 Isambard Status 和 Codex Radar。
-Local Days 与 Refresh Seconds 仅通过本地启动参数调整。关闭来源不会删除缓存。
+工具栏支持统一时间筛选，默认近 30 天。首页显示两张用量卡片；Radar 详情默认折叠。关闭来源不会删除缓存。
 
 Radar displays only **homepage degradation score cards**, grouped by model. Each
 card shows a two-decimal score and a thin bar scaled to **score / 150**. History
@@ -62,16 +61,16 @@ renders a late response for the old selection.
 
 | Source | Reuse / 更新策略 |
 | --- | --- |
-| Codex local | 5-second source cache; unchanged JSONL files reuse parsed metadata |
-| Codex online/reset credits | 60-second source cache, shared across views |
-| Claude | 15-second source cache; unchanged JSONL files reuse parsed metadata |
-| Optional Admin API | 60-second source cache |
+| Codex local | 5-second source cache; unchanged files read no content, appends read only the suffix |
+| Codex online/reset credits | Disabled: local-only policy |
+| Claude | 5-second source cache; same incremental metadata index |
+| Optional Admin API | Disabled: local-only policy |
 | Isambard | 30-second source cache over a 5-minute disk cache |
 | Radar | Independent 4-hour worker; one homepage request, up to 3 attempts for transient errors |
 
 网页同时最多加载两个区块，逐块显示结果。刷新间隔控制读取频率，各来源仍使用自己的缓存。
 手动刷新仅对 Isambard 绕过缓存，30 秒内最多启动一次；不会强制刷新 Radar 或 Claude 限额。
-`days` 控制本地每日表保留的最近有记录日期行数，模型和总 token 统计仍为全部历史。
+`range` 同时筛选总量、模型、项目、会话和图表，包含今天，按本地日历日计算。日期未知的用量仅计入全部历史，并单独提示。参见 [统计说明](docs/local-usage.md)。
 
 ## Paths and environment / 路径与环境变量
 
@@ -114,7 +113,7 @@ files are not deleted. Custom cache directories do not read legacy caches.
 | `GET /healthz` | Health check; no account data or authentication required |
 | `GET /api/usage` | Usage JSON |
 | `GET /api/codex-radar` | In-memory snapshot only; never triggers a fetch |
-| `GET /api/sources` | Current enabled sources |
+| `GET /api/sources` | Current sources, `accountNetworkEnabled: false`, and `localDate` |
 | `POST /api/sources?isambard=false&radar=true` | Change public-source switches; authenticated, requires `X-Codex-Usage-Action: set-sources` |
 
 Pages and data APIs require the browser session cookie, or
@@ -129,7 +128,9 @@ this exposes the server beyond the local machine.
 | --- | --- |
 | `report` | `all` (default), `codex-usage`, `claude-usage`, `isambard-status`, `resets`, `local-usage`, `online-usage`, `api-usage` |
 | `top` | Default 10, maximum 100 |
-| `days` | Default 30, maximum 365 |
+| `range` | `today`, `7d`, `30d` (default), `all` |
+| `range_anchor` | Optional local `YYYY-MM-DD`, defaults to today; future dates rejected |
+| `days` | Legacy setting; does not override local `range` |
 | `warn_days` | Default 7 |
 | `bucket_width` | `1d` (default), `1h`, `1m` |
 | `limit` | Optional Admin bucket count; maximum 1440 |

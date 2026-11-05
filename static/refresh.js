@@ -10,8 +10,10 @@ const DashboardRefresh = (() => {
     'codex-usage': ['local_usage', 'online_usage', 'reset_credits', 'api_usage'],
     'claude-usage': ['claude_usage'], 'isambard-status': ['isambard_status']
   };
-  async function request(report, days, force, signal) {
+  async function request(report, days, force, signal, range, anchor) {
     const params = new URLSearchParams({report, top: '10', days, warn_days: '7'});
+    params.set('range', range || '30d');
+    if (anchor) params.set('range_anchor', anchor);
     const options = {cache: 'no-store'};
     if (force && report === 'isambard-status') {
       params.set('isambard_force_refresh', 'true');
@@ -66,6 +68,8 @@ const DashboardRefresh = (() => {
     function emit() {
       const payload = {
         report: settings.report,
+        range: settings.range || '30d',
+        rangeAnchor: settings.rangeAnchor,
         ok: Object.keys(failures).length === 0,
         errors: Object.values(failures),
         pending: [...pending],
@@ -80,7 +84,8 @@ const DashboardRefresh = (() => {
       while (jobs.length && !settings.signal?.aborted) {
         const name = jobs.shift();
         try {
-          const payload = await request(definitions[name][1], settings.days, settings.force, settings.signal);
+          const payload = await request(definitions[name][1], settings.days, settings.force, settings.signal,
+                                        settings.range, settings.rangeAnchor);
           data[name] = payload.data;
           if (!payload.ok) {
             failures[name] = {section: name, message: payload.errors?.map(e => e.message).join('; ') || 'Source unavailable'};

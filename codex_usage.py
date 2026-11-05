@@ -851,197 +851,40 @@ def session_date_from_path(path: Path) -> str | None:
     return None
 
 
-_SESSION_CACHE: dict[str, tuple[tuple[int, int, int], dict[str, Any]]] = {}
-_SESSION_CACHE_LOCK = threading.Lock()
+# Kept as a public cache alias for CLI/tests; the index stores usage metadata only.
+from pulsedeck.local_usage import CODEX_INDEX, aggregate as aggregate_events
+_SESSION_CACHE = CODEX_INDEX.entries
 
 
-def scan_session_file(file_path: Path) -> dict[str, Any]:
-    """Parse one transcript; unchanged files reuse only usage metadata."""
-    lines_seen = parse_errors = 0
-    read_failed = False
-    final_usage: dict[str, int] | None = None
-    model: str | None = None
-    provider: str | None = None
-    context_window: int | None = None
-    project: str | None = None
-
-    try:
-        with file_path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                lines_seen += 1
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    parse_errors += 1
-                    continue
-                if not isinstance(obj, dict):
-                    continue
-                payload = (
-                    obj.get("payload")
-                    if isinstance(obj.get("payload"), dict)
-                    else obj
-                )
-                if not isinstance(payload, dict):
-                    continue
-
-                if isinstance(payload.get("model"), str):
-                    model = payload["model"]
-                if isinstance(payload.get("model_provider"), str):
-                    provider = payload["model_provider"]
-                if isinstance(payload.get("cwd"), str):
-                    project = payload["cwd"]
-
-                info = payload.get("info")
-                if isinstance(info, dict):
-                    total_usage = info.get("total_token_usage")
-                    if isinstance(total_usage, dict):
-                        parsed_usage = {
-                            key: int(total_usage.get(key) or 0)
-                            for key in USAGE_FIELDS
-                            if isinstance(total_usage.get(key), (int, float))
-                            and not isinstance(total_usage.get(key), bool)
-                            and math.isfinite(total_usage[key])
-                            and total_usage[key] >= 0
-                        }
-                        if parsed_usage:
-                            final_usage = parsed_usage
-                    if isinstance(info.get("model_context_window"), int):
-                        context_window = int(info["model_context_window"])
-    except OSError:
-        parse_errors += 1
-        read_failed = True
-
-
-    return dict(final_usage=final_usage, model=model, provider=provider,
-                context_window=context_window, project=project, lines_seen=lines_seen,
-                parse_errors=parse_errors, read_failed=read_failed)
-
-
-def cached_session_file(file_path: Path) -> dict[str, Any]:
-    with _SESSION_CACHE_LOCK:
-        try:
-            stat = file_path.stat()
-            signature = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
-        except OSError:
-            return scan_session_file(file_path)
-        key = str(file_path)
-        cached = _SESSION_CACHE.get(key)
-        if cached and cached[0] == signature:
-            return cached[1]
-        result = scan_session_file(file_path)
-        if not result["read_failed"]:
-            _SESSION_CACHE[key] = signature, result
-        return result
-
-
-def scan_sessions_metadata(codex_home: Path, top_n: int = 10) -> dict[str, Any]:
-    session_dir = codex_home.resolve() / "sessions"
-    codex_home = codex_home.resolve()
-    files = sorted(session_dir.rglob("*.jsonl")) if session_dir.exists() else []
-    live = {str(path) for path in files}
-    with _SESSION_CACHE_LOCK:
-        for key in list(_SESSION_CACHE):
-            if Path(key).is_relative_to(session_dir) and key not in live:
-                del _SESSION_CACHE[key]
-    daily_sessions: Counter[str] = Counter()
-    daily_usage: dict[str, Counter[str]] = defaultdict(Counter)
-    model_sessions: Counter[str] = Counter()
-    model_usage: dict[str, Counter[str]] = defaultdict(Counter)
-    provider_sessions: Counter[str] = Counter()
-    context_windows: Counter[str] = Counter()
-    final_totals: list[dict[str, Any]] = []
-    final_sum: Counter[str] = Counter()
-    parse_errors = 0
-    lines_seen = 0
-    files_with_usage = 0
-    mtime_values: list[datetime] = []
-
-    for file_path in files:
-        date_key = session_date_from_path(file_path) or "unknown"
-        daily_sessions[date_key] += 1
-        try:
-            mtime_values.append(
-                datetime.fromtimestamp(file_path.stat().st_mtime).astimezone()
-            )
-        except OSError:
-            pass
-
-        scanned = cached_session_file(file_path)
-        lines_seen += scanned["lines_seen"]
-        parse_errors += scanned["parse_errors"]
-        if scanned["read_failed"]:
-            continue
-        final_usage = scanned["final_usage"]
-        model, provider = scanned["model"], scanned["provider"]
-        context_window, project = scanned["context_window"], scanned["project"]
-
-        if model:
-            model_sessions[model] += 1
-        if provider:
-            provider_sessions[provider] += 1
-        if context_window is not None:
-            context_windows[str(context_window)] += 1
-        if final_usage:
-            files_with_usage += 1
-            for key, value in final_usage.items():
-                final_sum[key] += value
-                daily_usage[date_key][key] += value
-                if model:
-                    model_usage[model][key] += value
-            final_totals.append(
-                {
-                    "session_file": str(file_path.relative_to(codex_home)),
-                    "date": date_key,
-                    "model": model or "—",
-                    "project": short_path(project),
-                    "usage": final_usage,
-                }
-            )
-
-    final_totals.sort(
-        key=lambda item: item["usage"].get("total_tokens", 0), reverse=True
-    )
-    daily_usage_rows = []
-    for day in sorted(daily_sessions):
-        row = {"date": day, "sessions": daily_sessions[day]}
-        row.update(
-            {field: int(daily_usage[day].get(field, 0)) for field in USAGE_FIELDS}
-        )
-        daily_usage_rows.append(row)
-
+def scan_sessions_metadata(codex_home: Path, top_n: int = 10, range_name: str = "all", anchor=None) -> dict[str, Any]:
+    usage = aggregate_events(codex_home, "codex", top_n, range_name, anchor)
     return {
-        "session_files": len(files),
-        "jsonl_lines_scanned": lines_seen,
-        "parse_or_read_errors": parse_errors,
-        "files_with_final_token_totals": files_with_usage,
-        "file_mtime_start_local": min(mtime_values).strftime("%Y-%m-%d %H:%M:%S %Z %z")
-        if mtime_values
-        else None,
-        "file_mtime_end_local": max(mtime_values).strftime("%Y-%m-%d %H:%M:%S %Z %z")
-        if mtime_values
-        else None,
-        "final_token_totals_sum": dict(final_sum),
-        "models_by_session": model_sessions.most_common(top_n),
-        "model_token_totals": {
-            model: dict(counter) for model, counter in model_usage.items()
-        },
-        "providers_by_session": provider_sessions.most_common(20),
-        "context_windows_by_session": context_windows.most_common(20),
-        "daily_usage": daily_usage_rows,
-        "top_sessions_by_total_tokens": final_totals[:top_n],
+        "session_files": usage["files"],
+        "jsonl_lines_scanned": usage["jsonl_lines_scanned"],
+        "parse_or_read_errors": usage["quality"]["parse_errors"],
+        "files_with_final_token_totals": usage["session_count"],
+        "final_token_totals_sum": usage["token_totals"] if usage["unique_usage_records"] else {},
+        "models_by_session": [(r["model"], r["sessions"]) for r in usage["by_model"]],
+        "model_token_totals": {r["model"]: {"total_tokens": r["total_tokens"]} for r in usage["by_model"]},
+        "daily_usage": usage["daily_usage"],
+        "top_sessions_by_total_tokens": usage["top_sessions"],
+        "providers_by_session": [], "context_windows_by_session": [],
+        "file_mtime_start_local": None, "file_mtime_end_local": None,
+        "scope": usage["scope"], "quality": usage["quality"], "refresh": usage["refresh"],
+        "event_usage": usage,
     }
 
 
-def collect_local_usage(codex_home: Path, top_n: int) -> dict[str, Any]:
+def collect_local_usage(codex_home: Path, top_n: int, range_name: str = "all", anchor=None) -> dict[str, Any]:
     if not codex_home.exists():
         die(f"Codex home not found: {codex_home}")
+    sessions = scan_sessions_metadata(codex_home, top_n, range_name, anchor)
     return {
-        "retrieved_at_local": local_now_text(),
-        "codex_home": str(codex_home),
+        "retrieved_at_local": local_now_text(), "codex_home": str(codex_home),
         "network_calls_made": 0,
-        "privacy_note": "Local metadata only; prompt/assistant/transcript contents are not printed.",
-        "sqlite_threads": sqlite_threads_summary(codex_home, top_n=top_n),
-        "sessions": scan_sessions_metadata(codex_home, top_n=top_n),
+        "privacy_note": "Local usage events only; no conversation contents retained.",
+        "sqlite_threads": {"selected": None, "all": []},
+        "sessions": sessions, "usage": sessions.pop("event_usage"),
     }
 
 
@@ -1128,65 +971,6 @@ def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
             print(f"  • {item}")
         print()
 
-    print(colour("SQLite thread counters", "bold"))
-    print("-" * 22)
-    explain(
-        "Codex keeps a small local SQLite database of conversation threads. A thread is roughly a saved Codex conversation. The token counter here is Codex's local running total for those threads."
-    )
-    if selected and not selected.get("error"):
-        sqlite_rows = [
-            ["Database", selected.get("database") or "—"],
-            ["Threads", fmt_int(selected.get("rows"))],
-            ["Tokens used, total", fmt_int(selected.get("tokens_used_sum"))],
-            ["Tokens used, max thread", fmt_int(selected.get("tokens_used_max"))],
-            [
-                "Oldest thread timestamp",
-                fmt_local_timestamp(selected.get("created_at_min")),
-            ],
-            [
-                "Newest thread timestamp",
-                fmt_local_timestamp(selected.get("updated_at_max")),
-            ],
-        ]
-        print_counter_table(
-            "SQLite thread counter details", ["Metric", "Value"], sqlite_rows
-        )
-    elif selected and selected.get("error"):
-        print_counter_table(
-            "SQLite thread counter details",
-            ["Metric", "Value"],
-            [
-                ["Database", selected.get("database") or "—"],
-                ["Error", selected.get("error")],
-            ],
-        )
-    else:
-        print_counter_table("SQLite thread counter details", ["Metric", "Value"], [])
-
-    by_model_rows = []
-    if selected and isinstance(selected.get("by_model"), list):
-        total_sqlite = max(1, int(selected.get("tokens_used_sum") or 0))
-        for item in selected["by_model"][:top]:
-            tokens = int(item.get("tokens_used") or 0)
-            threads = int(item.get("threads") or 0)
-            by_model_rows.append(
-                [
-                    str(item.get("model", "—")),
-                    fmt_int(threads),
-                    fmt_int(tokens),
-                    fmt_int(tokens // max(1, threads)),
-                    fmt_percent(tokens / total_sqlite * 100),
-                ]
-            )
-    explain(
-        "This table groups the local thread counters by model so you can see which model accounts for most recorded usage on this machine."
-    )
-    print_counter_table(
-        "Tokens by model, from SQLite",
-        ["Model", "Threads", "Tokens", "Avg/thread", "Share"],
-        by_model_rows,
-    )
-
     print(colour("Session JSONL metadata", "bold"))
     print("-" * 22)
     explain(
@@ -1215,10 +999,10 @@ def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
         for field in USAGE_FIELDS
     ]
     explain(
-        "These totals use the last token counter seen in each session file. That avoids obvious double-counting, but the result is still an operational estimate rather than official billing data."
+        "Totals merge per-response usage and deduplicated cumulative snapshots. Records without a known date are included only in all-history totals; this is not official billing data."
     )
     print_counter_table(
-        "Approximate token totals, from final session counters",
+        "Local token totals, from usage events",
         ["Field", "Total"],
         token_rows,
     )
@@ -1235,7 +1019,7 @@ def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
         for row in recent_daily
     ]
     explain(
-        "Daily totals show when local Codex activity happened. They are grouped by the session file dates available on this machine."
+        "Daily totals use event timestamps in the local timezone. The legacy --days option limits this chart only; the dashboard time range filters every breakdown."
     )
     print_counter_table(
         f"Daily local token totals, last {len(recent_daily)} days",
@@ -1257,7 +1041,7 @@ def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
             ]
         )
     explain(
-        "This table comes from the session files rather than the SQLite thread database. It is a second local view of which models appear in your Codex history."
+        "Models are attributed from usage events and their turn context. Unattributable usage remains in the unknown model bucket."
     )
     print_counter_table(
         "Models seen in session metadata",
@@ -1291,10 +1075,10 @@ def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
     print("-----")
     print("• This mode is local-only and made no network calls.")
     print(
-        "• SQLite 'tokens_used' is Codex's local counter; it may not equal billable server-side usage."
+        "• Model totals use event metadata, not a thread's latest SQLite model label."
     )
     print(
-        "• Session token totals are taken from the final total_token_usage seen per session file to avoid obvious double-counting."
+        "• Direct request usage is preferred. Repeated cumulative snapshots are not counted again."
     )
 
 

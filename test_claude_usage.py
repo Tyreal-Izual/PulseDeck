@@ -123,15 +123,15 @@ class ClaudeTranscriptTest(unittest.TestCase):
             row = {'type':'assistant','timestamp':'2026-10-05T00:00:00Z',
                    'message':{'id':'1','usage':{'input_tokens':10}}}
             file.write_text(json.dumps(row)+'\n')
-            with patch.object(claude_usage, 'scan_file', wraps=claude_usage.scan_file) as scan:
-                claude_usage.aggregate_local_usage(home, 10, 30)
-                claude_usage.aggregate_local_usage(home, 10, 30)
-                self.assertEqual(scan.call_count, 1)
-                row['message']['id'] = '2'
-                with file.open('a') as handle: handle.write(json.dumps(row)+'\n')
-                result = claude_usage.aggregate_local_usage(home, 10, 30)
-                self.assertEqual(scan.call_count, 2)
-                self.assertEqual(result['token_totals']['total_tokens'], 20)
+            first = claude_usage.aggregate_local_usage(home, 10, 30)
+            second = claude_usage.aggregate_local_usage(home, 10, 30)
+            self.assertGreater(first['refresh']['bytes_read'], 0)
+            self.assertEqual(second['refresh']['bytes_read'], 0)
+            row['message']['id'] = '2'
+            with file.open('a') as handle: handle.write(json.dumps(row)+'\n')
+            result = claude_usage.aggregate_local_usage(home, 10, 30)
+            self.assertEqual(result['refresh']['files_appended'], 1)
+            self.assertEqual(result['token_totals']['total_tokens'], 20)
             file.unlink()
             self.assertEqual(claude_usage.aggregate_local_usage(home, 10, 30)['unique_usage_records'], 0)
 

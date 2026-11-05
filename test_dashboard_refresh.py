@@ -84,6 +84,21 @@ class ProgressiveRefreshTest(unittest.TestCase):
         self.assertEqual(result['method'], 'GET')
         self.assertNotIn('isambard_force_refresh', result['url'])
 
+    def test_local_sources_share_range_and_anchor_without_account_requests(self):
+        result = self.run_js('''
+        const requests=[];
+        global.fetch=async url=>{
+          requests.push(Object.fromEntries(new URL(url,'http://local').searchParams));
+          return {ok:true,status:200,json:async()=>({ok:true,data:{}})};
+        };
+        DashboardRefresh.run({report:'all',range:'7d',rangeAnchor:'2026-10-01',days:'30',
+          sources:['codex','claude'],accountNetworkEnabled:false},()=>{})
+          .then(last=>process.stdout.write(JSON.stringify({requests,last})));
+        ''')
+        self.assertEqual({r['report'] for r in result['requests']}, {'local-usage','claude-usage'})
+        self.assertTrue(all(r['range']=='7d' and r['range_anchor']=='2026-10-01' for r in result['requests']))
+        self.assertEqual(result['last']['range'], '7d')
+
     def test_cancelled_refresh_stops_queued_source_requests(self):
         result = self.run_js("""
         const controller = new AbortController(), requests=[];

@@ -85,7 +85,7 @@ __RADAR_STYLE__
 
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(245px, 1.55fr) minmax(175px, 1.05fr) repeat(4, auto);
+      grid-template-columns: minmax(190px, 1.3fr) minmax(150px, 1fr) minmax(125px, .8fr) repeat(4, auto);
       gap: 10px;
       align-items: center;
       margin-bottom: 18px;
@@ -853,10 +853,29 @@ __RADAR_STYLE__
     .brand-label { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .15em; margin-bottom: 8px; }
     .brand-label span { padding: 2px 7px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); letter-spacing: 0; }
     h1 { font-size: 36px; letter-spacing: -.04em; }
-    .module-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 20px; }
-    .module-nav a { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); text-decoration: none; font-weight: 650; transition: border-color .15s; }
-    .module-nav a:hover, .module-nav a:focus-visible { border-color: var(--accent); }
-    .module-nav small { width: 100%; padding-left: 16px; color: var(--muted); font-size: 11px; font-weight: 400; }
-    .module-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-    .claude-dot { background: #d8a084; } .isambard-dot { background: #90b3f6; } .radar-dot { background: #c6a5ee; }
-    @media (max-width: 650px) { .module-nav { grid-template-columns: repeat(2, 1fr); } .module-nav a { padding: 12px; } }
+
+    .scope-bar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px 20px; color:var(--muted); font-size:11px; margin:-4px 0 16px; }
+    .scope-bar span:first-child { color:var(--accent); }
+    .usage-total { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; font-size:34px; font-weight:650; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+    .usage-total > span:last-child { font-size:12px; color:var(--muted); letter-spacing:0; font-weight:400; }
+    .usage-meta { display:flex; gap:12px; color:var(--muted); font-size:12px; margin:2px 0 18px; }
+    .usage-trend { margin:14px 0 20px; }
+    .trend-caption, .trend-axis { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:10px; }
+    .trend-caption { margin-bottom:8px; }
+    .trend-bars { height:76px; display:flex; gap:3px; align-items:flex-end; border-bottom:1px solid var(--line); background:linear-gradient(var(--line) 1px, transparent 1px) top / 100% 38px; }
+    .trend-slot { height:100%; flex:1; display:flex; align-items:flex-end; min-width:0; }
+    .trend-slot i { display:block; width:100%; max-width:36px; margin:auto auto 0; background:var(--accent); border-radius:2px 2px 0 0; min-height:1px; }
+    [data-panel-id^="claude-"] .trend-slot i { background:#d8a084; }
+    .trend-slot:focus-visible { outline:1px solid var(--ink); }
+    .trend-axis { margin-top:7px; }
+    .usage-caveat, .footnote { font-size:11px; color:var(--muted); }
+    .usage-caveat p { margin:8px 0; }
+    .data-notes { margin-top:14px; color:var(--muted); font-size:12px; }
+    .data-notes summary, .collapsed-panel > summary { cursor:pointer; padding:8px 0; }
+    .collapsed-panel { border:1px solid var(--line); border-radius:8px; background:var(--panel); overflow:hidden; }
+    .collapsed-panel > summary { padding:14px 18px; font-weight:600; color:var(--muted); }
+    .collapsed-panel > .panel { border:0; border-top:1px solid var(--line); border-radius:0; box-shadow:none; }
+    .footnote { margin:16px 0 0; }
+    @media (max-width:1100px) { .toolbar { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width:640px) { .toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar select { min-width:0; width:100%; } .usage-total {font-size:30px;} }
+    .trend-plot {display:flex;gap:8px;} .trend-bars {flex:1;min-width:0;} .trend-scale {display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font-size:10px;min-width:52px;text-align:right;} .trend-axis {padding-right:60px;}

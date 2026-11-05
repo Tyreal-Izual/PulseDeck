@@ -12,7 +12,7 @@ __CSS__
   <main class="shell">
     <header>
       <div>
-        <div class="brand-label">LOCAL ACCOUNT DATA <span>v0.3</span></div>
+        <div class="brand-label">LOCAL USAGE <span>v0.4</span></div>
         <h1 data-i18n="appTitle">PulseDeck</h1>
         <p class="subtitle" data-i18n="subtitle">A local-only view of Codex and Claude Code rate limits and token usage.</p>
       </div>
@@ -30,6 +30,15 @@ __CSS__
           <option value="codex-usage" data-i18n="reportCodex">Codex Usage</option>
           <option value="claude-usage" data-i18n="reportClaude">Claude Code Usage</option>
           <option value="isambard-status" data-i18n="reportIsambard">Isambard Service Status</option>
+        </select>
+      </label>
+      <label class="toolbar-field">
+        <span data-i18n="timeRange">Time range</span>
+        <select id="time-range">
+          <option value="today" data-i18n="rangeToday">Today</option>
+          <option value="7d" data-i18n="range7d">Last 7 days</option>
+          <option value="30d" data-i18n="range30d" selected>Last 30 days</option>
+          <option value="all" data-i18n="rangeAll">All local history</option>
         </select>
       </label>
       <label class="toolbar-field">
@@ -54,14 +63,10 @@ __CSS__
       <button id="refresh-now" type="button" data-i18n="refresh">Refresh</button>
     </div>
 
-    <nav class="module-nav" aria-label="Modules">
-      <a href="/?report=codex-usage"><span class="module-dot"></span>Codex <small data-i18n="moduleUsage">Usage</small></a>
-      <a href="/?report=claude-usage"><span class="module-dot claude-dot"></span>Claude <small data-i18n="moduleUsage">Usage</small></a>
-      <a href="/?report=isambard-status"><span class="module-dot isambard-dot"></span>Isambard <small data-i18n="moduleStatus">Service status</small></a>
-      <a href="/?report=all#codex-radar"><span class="module-dot radar-dot"></span>Radar <small data-i18n="moduleScores">Model scores</small></a>
-    </nav>
+    <div class="scope-bar"><span id="local-policy" data-i18n="localPolicy"></span><span id="scope-note" data-i18n="rangePublicNote"></span></div>
     <div id="notice" class="notice"></div>
     <div id="sections" class="sections"></div>
+    <p id="quota-note" class="footnote" data-i18n="quotaNote"></p>
   </main>
 
   <button id="return-to-limits" class="return-to-limits" type="button" hidden>

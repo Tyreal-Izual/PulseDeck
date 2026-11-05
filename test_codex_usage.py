@@ -27,11 +27,11 @@ class SessionCacheTest(unittest.TestCase):
 
     def test_unchanged_files_are_read_once_and_final_cumulative_total_is_used(self):
         self.file.write_text(self.row(10) + self.row(25))
-        with patch.object(codex, 'scan_session_file', wraps=codex.scan_session_file) as scan:
-            first = codex.scan_sessions_metadata(self.home)
-            second = codex.scan_sessions_metadata(self.home)
-        self.assertEqual(scan.call_count, 1)
-        self.assertEqual(first, second)
+        first = codex.scan_sessions_metadata(self.home)
+        second = codex.scan_sessions_metadata(self.home)
+        self.assertGreater(first['refresh']['bytes_read'], 0)
+        self.assertEqual(second['refresh']['bytes_read'], 0)
+        self.assertEqual(first['final_token_totals_sum'], second['final_token_totals_sum'])
         self.assertEqual(first['final_token_totals_sum']['total_tokens'], 25)
 
     def test_append_truncate_replace_and_delete_invalidate_cache(self):

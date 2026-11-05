@@ -48,6 +48,15 @@ class CollectionTest(unittest.TestCase):
             web.collect_report('online-usage', 20, 60, 7, '1d', None, [], False, False, source_cache=cache)
         self.assertEqual(collect.call_count, 1)
 
+    def test_local_cache_separates_ranges_and_calendar_anchor(self):
+        cache = sources.SourceCache()
+        with patch.object(web.codex_usage, 'collect_local_usage', return_value={}) as codex, patch.object(web.claude_usage, 'collect_usage', return_value={}) as claude:
+            for scope, anchor in [('today','2026-10-01'),('7d','2026-10-01'),('7d','2026-10-02'),('7d','2026-10-02')]:
+                self.report(source_cache=cache, enabled_sources=frozenset({'codex','claude'}), range_name=scope, range_anchor=anchor)
+            self.assertEqual(codex.call_count, 3)
+            self.assertEqual(claude.call_count, 3)
+            self.assertEqual(codex.call_args.kwargs['anchor'], claude.call_args.kwargs['anchor'])
+
     def test_live_isambard_survives_cache_write_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             status = {'statuses': [{'title': 'OK'}], 'fetched_at': '2026-10-05T00:00:00+00:00'}

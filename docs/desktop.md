@@ -11,7 +11,7 @@ the window stops that backend. A second launch activates the existing window.
 An explicitly clicked external source link can open the default browser.
 
 Account collection remains local-only. Isambard and Radar still fetch public
-information. The previous statistics definitions have not changed in this release.
+information. Version 0.4 uses [event accounting and unified time ranges](local-usage.md).
 
 Runtime state, bounded error logs, and WebView preferences live under
 `%LOCALAPPDATA%\PulseDeck\desktop`. The desktop backend normally uses port 8766

@@ -1,6 +1,6 @@
 # PulseDeck
 
-> Current policy (0.2): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. The disabled cloud adapters are retained only for possible future development.
+> Current policy (0.4): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. The disabled cloud adapters are retained only for possible future development.
 
 **Your local dashboard for AI usage, infrastructure status, and model intelligence.**
 
@@ -49,12 +49,20 @@ The default port is 8765; if occupied, the application selects an available loca
 
 ## Data sources and limitations
 
-- **Codex:** reads local session metadata and the local thread database. Account network access is disabled in `pulsedeck/privacy.py`, including the app-server, legacy backend and Admin API paths. No cloud fallback is used.
+- **Codex:** reads local usage events and cumulative snapshots, attributing models from turn context. Account network access is disabled in `pulsedeck/privacy.py`, including the app-server, legacy backend and Admin API paths. No cloud fallback is used.
 - **Claude:** local JSONL history is independent of subscription quota capture. The official statusLine supplies quotas only when a compatible Claude Code client invokes it with those fields. Claude Desktop may write history without invoking the bridge. Missing or stale quotas stay visibly unavailable/stale; browser refresh cannot create a new account snapshot. This release does not automate a hidden Claude conversation or port the macOS expect refresher.
 - **Isambard:** public service health and maintenance, not personal jobs or GPU allocations.
 - **Radar:** community assessment scores, not official model ratings. HTML/catalog changes can require adapter updates; failed updates keep the last valid snapshot and its original timestamp.
 
 Only usage metadata is displayed. Local token history is not a billing statement or a full account-wide total.
+
+## Usage views
+
+Choose **Today / Last 7 days / Last 30 days / All local history**. Totals,
+models, projects, sessions, and charts share the same local calendar range.
+The overview has two usage cards; quota capture and Radar details are collapsed.
+Unchanged logs require no content reads; appends read only the suffix and small
+hash anchors. The index stays in memory. See [accounting and limitations](docs/local-usage.md).
 
 ## Local storage
 

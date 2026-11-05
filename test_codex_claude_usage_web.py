@@ -142,6 +142,25 @@ class UsageWebSecurityTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(collector.call_args.kwargs["limit"], web.MAX_ADMIN_LIMIT)
 
+    def test_invalid_time_range_is_rejected_before_collection(self):
+        with patch.object(web, "collect_report") as collector:
+            for query in ("range=week", "range_anchor=not-a-date", "range_anchor=9999-12-31",
+                          "range=30d&range_anchor=0001-01-01"):
+                status, _, _ = self.request("/api/usage?" + query, authorization=f"Bearer {self.access_token}")
+                self.assertEqual(status, 400)
+            collector.assert_not_called()
+
+    def test_range_and_anchor_are_passed_and_cache_keys_are_distinct(self):
+        with patch.object(web, "collect_report", return_value=({}, [])) as collector:
+            for scope, anchor in (("today", "2026-10-01"), ("7d", "2026-10-01"), ("7d", "2026-10-02")):
+                status, _, body = self.request(f"/api/usage?report=local-usage&range={scope}&range_anchor={anchor}",
+                                               authorization=f"Bearer {self.access_token}")
+                self.assertEqual(status, 200)
+                self.assertEqual(collector.call_args.kwargs["range_name"], scope)
+                self.assertEqual(collector.call_args.kwargs["range_anchor"], anchor)
+                self.assertEqual(json.loads(body)["settings"]["scope"]["end"], anchor)
+            self.assertEqual(collector.call_count, 3)
+
     def test_distinct_api_collection_is_rate_limited_at_capacity(self) -> None:
         cookie = self.session_cookie()
         started = threading.Event()

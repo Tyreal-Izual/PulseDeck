@@ -20,7 +20,6 @@ import shlex
 import subprocess
 import sys
 import threading
-from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -70,13 +69,6 @@ def local_timestamp_text(value: Any) -> str | None:
     return parsed.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z %z")
 
 
-def local_date(value: Any) -> str:
-    parsed = parse_timestamp(value)
-    if parsed is None:
-        return "unknown"
-    return parsed.astimezone().strftime("%Y-%m-%d")
-
-
 def finite_number(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -84,301 +76,17 @@ def finite_number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def nonnegative_int(value: Any) -> int:
-    number = finite_number(value)
-    if number is None:
-        return 0
-    return max(0, int(number))
+from pulsedeck.local_usage import CLAUDE_INDEX, aggregate as aggregate_events
+_FILE_CACHE = CLAUDE_INDEX.entries
 
 
-def short_path(value: str | None, max_chars: int = 64) -> str:
-    if not value:
-        return "-"
-    text = str(value).replace(str(Path.home()), "~", 1)
-    if len(text) <= max_chars:
-        return text
-    parts = Path(text).parts
-    if len(parts) >= 3:
-        text = f"{parts[0]}/…/{parts[-1]}"
-    return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
-
-
-def token_usage(usage: dict[str, Any]) -> dict[str, int]:
-    out = {field: nonnegative_int(usage.get(field)) for field in TOKEN_FIELDS}
-    out[TOTAL_FIELD] = sum(out.values())
-    return out
-
-
-def usage_key(
-    obj: dict[str, Any],
-    message: dict[str, Any],
-    usage: dict[str, int],
-    file_path: Path,
-) -> str:
-    message_id = str(message.get("id") or "").strip()
-    request_id = str(obj.get("requestId") or "").strip()
-    if message_id or request_id:
-        return f"message={message_id}|request={request_id}"
-
-    # Older or provider-specific records can omit both identifiers. This
-    # fallback still collapses repeated streaming records in the same file.
-    signature = [
-        str(obj.get("sessionId") or file_path.stem),
-        str(obj.get("timestamp") or ""),
-        str(message.get("model") or "unknown"),
-        *(str(usage[field]) for field in (*TOKEN_FIELDS, TOTAL_FIELD)),
-    ]
-    return "fallback=" + "|".join(signature)
-
-
-def scan_file(file_path: Path, claude_home: Path) -> dict[str, Any]:
-    records: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    lines_seen = 0
-    parse_errors = 0
-    usage_rows_seen = 0
-    duplicate_rows = 0
-
-    try:
-        with file_path.open("r", encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                lines_seen += 1
-                try:
-                    obj = json.loads(line)
-                except json.JSONDecodeError:
-                    parse_errors += 1
-                    continue
-                if not isinstance(obj, dict) or obj.get("type") != "assistant":
-                    continue
-                message = obj.get("message")
-                if not isinstance(message, dict):
-                    continue
-                raw_usage = message.get("usage")
-                if not isinstance(raw_usage, dict):
-                    continue
-
-                usage = token_usage(raw_usage)
-                usage_rows_seen += 1
-                if usage[TOTAL_FIELD] <= 0:
-                    continue
-                key = usage_key(obj, message, usage, file_path)
-                if key in seen:
-                    duplicate_rows += 1
-                    continue
-                seen.add(key)
-
-                timestamp = obj.get("timestamp")
-                cwd = obj.get("cwd") if isinstance(obj.get("cwd"), str) else None
-                records.append(
-                    {
-                        "key": key,
-                        "timestamp": timestamp,
-                        "date": local_date(timestamp),
-                        "model": str(message.get("model") or "unknown"),
-                        "project": short_path(cwd),
-                        "session_id": str(obj.get("sessionId") or file_path.stem),
-                        "session_file": str(file_path.relative_to(claude_home)),
-                        "usage": usage,
-                    }
-                )
-    except OSError:
-        parse_errors += 1
-
-    return {
-        "records": records,
-        "lines_seen": lines_seen,
-        "parse_errors": parse_errors,
-        "usage_rows_seen": usage_rows_seen,
-        "duplicate_rows": duplicate_rows,
-    }
-
-
-_FILE_CACHE: dict[str, tuple[tuple[int, int], dict[str, Any]]] = {}
-_CACHE_LOCK = threading.Lock()
-
-
-def cached_file_scan(file_path: Path, claude_home: Path) -> dict[str, Any]:
-    try:
-        stat = file_path.stat()
-        signature = (stat.st_mtime_ns, stat.st_size)
-    except OSError:
-        return {
-            "records": [],
-            "lines_seen": 0,
-            "parse_errors": 1,
-            "usage_rows_seen": 0,
-            "duplicate_rows": 0,
-        }
-
-    cache_key = str(file_path)
-    cached = _FILE_CACHE.get(cache_key)
-    if cached and cached[0] == signature:
-        return cached[1]
-    result = scan_file(file_path, claude_home)
-    _FILE_CACHE[cache_key] = (signature, result)
+def aggregate_local_usage(claude_home: Path, top_n: int, days: int = 30, range_name: str = "all", anchor=None) -> dict[str, Any]:
+    result = aggregate_events(claude_home, "claude", top_n, range_name, anchor)
+    result.update(projects_dir=str(claude_home / "projects"), session_files=result["files"],
+                  parse_or_read_errors=result["quality"]["parse_errors"],
+                  duplicate_usage_records_skipped=result["quality"]["duplicates_skipped"],
+                  usage_rows_seen=result["unique_usage_records"] + result["quality"]["duplicates_skipped"])
     return result
-
-
-def add_usage(target: Counter[str], usage: dict[str, int]) -> None:
-    for field in (*TOKEN_FIELDS, TOTAL_FIELD):
-        target[field] += int(usage.get(field) or 0)
-
-
-def counter_dict(counter: Counter[str]) -> dict[str, int]:
-    return {field: int(counter.get(field, 0)) for field in (*TOKEN_FIELDS, TOTAL_FIELD)}
-
-
-def aggregate_local_usage(claude_home: Path, top_n: int, days: int) -> dict[str, Any]:
-    projects_dir = claude_home / "projects"
-    files = sorted(projects_dir.rglob("*.jsonl")) if projects_dir.exists() else []
-
-    totals: Counter[str] = Counter()
-    daily: dict[str, Counter[str]] = defaultdict(Counter)
-    daily_sessions: dict[str, set[str]] = defaultdict(set)
-    model_totals: dict[str, Counter[str]] = defaultdict(Counter)
-    model_requests: Counter[str] = Counter()
-    project_totals: dict[str, Counter[str]] = defaultdict(Counter)
-    project_requests: Counter[str] = Counter()
-    session_totals: dict[str, Counter[str]] = defaultdict(Counter)
-    session_meta: dict[str, dict[str, Any]] = {}
-
-    lines_seen = 0
-    parse_errors = 0
-    usage_rows_seen = 0
-    duplicate_rows = 0
-    unique_records = 0
-    globally_seen: set[str] = set()
-    latest_record_at: datetime | None = None
-
-    with _CACHE_LOCK:
-        live_paths = {str(path) for path in files}
-        for stale_path in set(_FILE_CACHE) - live_paths:
-            _FILE_CACHE.pop(stale_path, None)
-
-        for file_path in files:
-            scanned = cached_file_scan(file_path, claude_home)
-            lines_seen += int(scanned["lines_seen"])
-            parse_errors += int(scanned["parse_errors"])
-            usage_rows_seen += int(scanned["usage_rows_seen"])
-            duplicate_rows += int(scanned["duplicate_rows"])
-
-            for record in scanned["records"]:
-                key = record["key"]
-                if key in globally_seen:
-                    duplicate_rows += 1
-                    continue
-                globally_seen.add(key)
-                unique_records += 1
-
-                record_at = parse_timestamp(record.get("timestamp"))
-                if record_at is not None and (
-                    latest_record_at is None or record_at > latest_record_at
-                ):
-                    latest_record_at = record_at
-
-                usage = record["usage"]
-                day = record["date"]
-                model = record["model"]
-                project = record["project"]
-                session_file = record["session_file"]
-
-                add_usage(totals, usage)
-                add_usage(daily[day], usage)
-                daily[day]["requests"] += 1
-                daily_sessions[day].add(session_file)
-                add_usage(model_totals[model], usage)
-                model_requests[model] += 1
-                add_usage(project_totals[project], usage)
-                project_requests[project] += 1
-                add_usage(session_totals[session_file], usage)
-                session_totals[session_file]["requests"] += 1
-
-                meta = session_meta.setdefault(
-                    session_file,
-                    {
-                        "date": day,
-                        "timestamp": record.get("timestamp"),
-                        "models": set(),
-                        "project": project,
-                        "session_id": record["session_id"],
-                    },
-                )
-                meta["models"].add(model)
-                if str(record.get("timestamp") or "") > str(meta.get("timestamp") or ""):
-                    meta["timestamp"] = record.get("timestamp")
-                    meta["date"] = day
-                    meta["project"] = project
-
-    daily_rows: list[dict[str, Any]] = []
-    for day in sorted(daily):
-        row: dict[str, Any] = {
-            "date": day,
-            "sessions": len(daily_sessions[day]),
-            "requests": int(daily[day].get("requests", 0)),
-        }
-        row.update(counter_dict(daily[day]))
-        daily_rows.append(row)
-    if days > 0:
-        daily_rows = daily_rows[-days:]
-
-    by_model = []
-    for model, counter in sorted(
-        model_totals.items(), key=lambda item: item[1].get(TOTAL_FIELD, 0), reverse=True
-    ):
-        row = {"model": model, "requests": int(model_requests[model])}
-        row.update(counter_dict(counter))
-        by_model.append(row)
-
-    by_project = []
-    for project, counter in sorted(
-        project_totals.items(), key=lambda item: item[1].get(TOTAL_FIELD, 0), reverse=True
-    ):
-        row = {"project": project, "requests": int(project_requests[project])}
-        row.update(counter_dict(counter))
-        by_project.append(row)
-
-    top_sessions = []
-    for session_file, counter in sorted(
-        session_totals.items(), key=lambda item: item[1].get(TOTAL_FIELD, 0), reverse=True
-    )[:top_n]:
-        meta = session_meta[session_file]
-        top_sessions.append(
-            {
-                "date": meta["date"],
-                "models": sorted(meta["models"]),
-                "project": meta["project"],
-                "session_id": meta["session_id"],
-                "session_file": session_file,
-                "requests": int(counter.get("requests", 0)),
-                "usage": counter_dict(counter),
-            }
-        )
-
-    return {
-        "available": projects_dir.exists(),
-        "projects_dir": str(projects_dir),
-        "session_files": len(files),
-        "jsonl_lines_scanned": lines_seen,
-        "parse_or_read_errors": parse_errors,
-        "usage_rows_seen": usage_rows_seen,
-        "unique_usage_records": unique_records,
-        "duplicate_usage_records_skipped": duplicate_rows,
-        "token_totals": counter_dict(totals),
-        "daily_usage": daily_rows,
-        "by_model": by_model[:top_n],
-        "by_project": by_project[:top_n],
-        "top_sessions": top_sessions,
-        "latest_record_at_local": (
-            latest_record_at.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z %z")
-            if latest_record_at is not None
-            else None
-        ),
-        "latest_record_at_unix_ms": (
-            round(latest_record_at.timestamp() * 1000)
-            if latest_record_at is not None
-            else None
-        ),
-    }
 
 
 def stale_seconds() -> int:
@@ -618,6 +326,7 @@ def collect_usage(
     top_n: int = 10,
     days: int = 30,
     snapshot_path: Path | None = None,
+    *, range_name: str = "all", anchor=None,
 ) -> dict[str, Any]:
     home = (claude_home or CLAUDE_HOME).expanduser()
     snapshot = (snapshot_path or resolve_snapshot_path(home)).expanduser()
@@ -628,7 +337,7 @@ def collect_usage(
         "network_calls_made": 0,
         "privacy_note": "Usage metadata only; prompts, responses, tool inputs, and transcript content are ignored.",
         "rate_limits": collect_rate_limits(home, snapshot),
-        "local_usage": aggregate_local_usage(home, top_n=max(1, top_n), days=max(1, days)),
+        "local_usage": aggregate_local_usage(home, top_n=max(1, top_n), days=max(1, days), range_name=range_name, anchor=anchor),
     }
 
 
