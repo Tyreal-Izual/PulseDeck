@@ -1,0 +1,40 @@
+name: Windows desktop EXE
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '**.py'
+      - 'static/**'
+      - 'templates/**'
+      - 'assets/**'
+      - 'PulseDeck.spec'
+      - 'requirements-desktop.txt'
+      - 'Build-Desktop.ps1'
+      - '.github/workflows/desktop.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        shell: pwsh
+        run: ./Build-Desktop.ps1 -Python (Get-Command python).Source
+      - name: Packaged self-check
+        shell: pwsh
+        run: |
+          $output=Join-Path $env:RUNNER_TEMP 'pulsedeck-check.json'
+          $app=Start-Process -FilePath ./dist/PulseDeck.exe -ArgumentList @('--self-check', $output) -WindowStyle Hidden -PassThru
+          if (-not $app.WaitForExit(30000)) { throw 'Desktop self-check timed out' }
+          if ($app.ExitCode -ne 0) { throw 'Desktop self-check failed' }
+          $result=Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+          if (-not $result.ok) { throw 'Desktop package validation failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PulseDeck-Windows-x64
+          path: dist/PulseDeck.exe

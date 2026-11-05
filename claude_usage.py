@@ -389,6 +389,8 @@ def stale_seconds() -> int:
 
 
 def statusline_script_path() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().with_name("claude_usage_statusline.py")
     return Path(__file__).resolve().with_name("claude_usage_statusline.py")
 
 

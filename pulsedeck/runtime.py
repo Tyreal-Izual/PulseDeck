@@ -32,10 +32,10 @@ def data_directory() -> Path:
 def session_path() -> Path:
     return data_directory() / "run.json"
 
-def read_session() -> dict | None:
+def read_session(path: Path | None = None, *, require_root: bool = True) -> dict | None:
     try:
-        value = json.loads(session_path().read_text(encoding="utf-8"))
-        if not isinstance(value, dict) or value.get("root") != str(ROOT):
+        value = json.loads((path or session_path()).read_text(encoding="utf-8"))
+        if not isinstance(value, dict) or (require_root and value.get("root") != str(ROOT)):
             return None
         port = value.get("port")
         if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
@@ -46,13 +46,13 @@ def read_session() -> dict | None:
     except (OSError, ValueError):
         return None
 
-def local_request(session: dict, path: str, *, stop: bool = False) -> dict:
+def local_request(session: dict, path: str, *, stop: bool = False, action: str | None = None) -> dict:
     # Never use a URL read from disk: control requests are always loopback-only.
     request = urllib.request.Request(
         f"http://127.0.0.1:{session['port']}{path}",
         headers={"Authorization": "Bearer " + session["token"],
-                 "X-PulseDeck-Action": "stop" if stop else "read"},
-        method="POST" if stop else "GET",
+                 "X-PulseDeck-Action": action or ("stop" if stop else "read")},
+        method="POST" if stop or action else "GET",
     )
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.open(request, timeout=2) as response:
@@ -75,8 +75,11 @@ def access_url(session: dict) -> str:
 
 class InstanceLock:
     """OS lock released automatically if the process crashes."""
+    def __init__(self, path: Path | None = None):
+        self.path = path
+
     def __enter__(self):
-        path = data_directory() / "instance.lock"
+        path = self.path or data_directory() / "instance.lock"
         path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = path.open("a+b")
         self.handle.seek(0, 2)
@@ -100,8 +103,10 @@ class InstanceLock:
         self.handle.close()
 
 class Runtime:
-    """Owns collectors and the temporary HTTP UI; a future desktop shell can reuse it."""
-    def __init__(self, *, port: int = 8765, sources: str = "auto"):
+    """Owns local collectors and authenticated transport for either presentation."""
+    def __init__(self, *, port: int = 8765, sources: str = "auto",
+                 state_path: Path | None = None, presentation: str = "browser", on_activate=None,
+                 on_stop=None):
         import codex_claude_usage_web as web
         import codex_usage
 
@@ -113,10 +118,22 @@ class Runtime:
                     return
                 with handler.server.sources_lock:
                     enabled = handler.server.enabled_sources
-                handler.send_json({"application": "PulseDeck", "version": __version__,
+                handler.send_json({"application": "PulseDeck", "version": __version__, "presentation": presentation,
                                    "modules": describe(enabled)})
 
             def do_POST(handler):
+                if urllib.parse.urlparse(handler.path).path == "/api/pulsedeck/activate":
+                    if handler.reject_untrusted_host(include_body=True) or handler.reject_missing_access(include_body=True):
+                        return
+                    if handler.headers.get("X-PulseDeck-Action") != "activate":
+                        handler.send_json({"ok": False, "error": "activate action required"}, status=403)
+                        return
+                    if on_activate is None:
+                        handler.send_json({"ok": False, "error": "no desktop window"}, status=404)
+                        return
+                    on_activate()
+                    handler.send_json({"ok": True})
+                    return
                 if urllib.parse.urlparse(handler.path).path != "/api/pulsedeck/stop":
                     return super().do_POST()
                 if handler.reject_untrusted_host(include_body=True) or handler.reject_missing_access(include_body=True):
@@ -125,7 +142,7 @@ class Runtime:
                     handler.send_json({"ok": False, "error": "stop action required"}, status=403)
                     return
                 handler.send_json({"ok": True})
-                threading.Thread(target=handler.server.shutdown, daemon=True).start()
+                threading.Thread(target=on_stop or handler.server.shutdown, daemon=True).start()
 
         token = secrets.token_urlsafe(32)
         options = dict(access_token=token, allowed_hosts=[], max_workers=8,
@@ -145,14 +162,17 @@ class Runtime:
         self.server.quiet = True
         self.session = {"root": str(ROOT), "port": self.server.server_address[1],
                         "pid": os.getpid(), "token": token, "started_at": time.time()}
+        self.state_path = state_path or session_path()
+        self.ready = threading.Event()
 
     def serve(self):
         try:
-            atomic_write_json(session_path(), self.session)
+            atomic_write_json(self.state_path, self.session)
             self.server.radar_service.start()
+            self.ready.set()
             self.server.serve_forever(poll_interval=0.2)
         finally:
             self.server.server_close()
-            current = read_session()
+            current = read_session(self.state_path, require_root=False)
             if current and current.get("token") == self.session["token"]:
-                session_path().unlink(missing_ok=True)
+                self.state_path.unlink(missing_ok=True)

@@ -13,12 +13,26 @@ PulseDeck runs on your Windows computer and brings together four independent mod
 | Isambard | Public service status and planned maintenance |
 | Radar | Current community degradation scores, source test period, cached fallback |
 
-## Start on Windows
+## Windows desktop
 
-Double-click **Start-PulseDeck.cmd**. It starts a hidden background process and opens your browser.
-Starting it again opens the existing instance. Closing the browser leaves collection running.
+Double-click **PulseDeck.exe** to open the standalone application window. Python
+is included in the EXE; no terminal or separate browser is needed. Launching it
+again activates the existing window. Closing the window stops its own backend.
 
-- **Stop-PulseDeck.cmd** stops the background process.
+Build from source with `Build-Desktop.ps1`; the result is `dist/PulseDeck.exe`.
+Windows desktop builds are also produced by the **Windows desktop EXE** GitHub
+Actions workflow. See [desktop build and runtime notes](docs/desktop.md).
+
+The desktop window uses Microsoft Edge WebView2 Runtime, already present on
+the development PC. It runs with normal user permissions.
+
+## Browser / source entry
+
+**Start-PulseDeck.cmd** opens the root desktop EXE when it exists. Otherwise it
+uses the source browser entry. The browser entry starts a hidden backend;
+closing that browser tab leaves the backend running.
+
+- **Stop-PulseDeck.cmd** closes the desktop instance, or stops the legacy browser backend.
 - **Check-PulseDeck.cmd** shows read-only setup diagnostics.
 - **Setup-Claude-Capture.cmd** installs the optional Claude Code quota capture, preserving an existing custom status line.
 
@@ -60,7 +74,8 @@ GitHub synchronizes code and documentation, not credentials, conversation files,
 `pulsedeck/modules.py` declares the four modules.
 `pulsedeck/runtime.py` owns application lifecycle and local control.
 Existing standalone collectors remain UI-independent and keep their regression tests.
-The current browser is the first presentation layer; a tray/native window can reuse the runtime and collectors.
+The desktop window and browser entry share the same collectors. Desktop lifecycle
+and window activation live in `pulsedeck/desktop.py`.
 
 See [Windows development notes](docs/pulsedeck.md), [upstream dashboard API](WEB_DASHBOARD.md),
 [Claude capture details](docs/claude-setup.md), and [Radar rules](docs/radar.md).

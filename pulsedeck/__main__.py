@@ -62,15 +62,18 @@ def main(argv=None) -> int:
         install(False)
         return 0
     if args.command == "stop":
-        session = running_session()
+        from .desktop import running_desktop_session
+        desktop_session = running_desktop_session()
+        session = desktop_session or running_session()
         if not session:
             print("PulseDeck is not running.")
             return 0
         local_request(session, "/api/pulsedeck/stop", stop=True)
         deadline = time.monotonic() + 8
-        while time.monotonic() < deadline and running_session():
+        find_session = running_desktop_session if desktop_session else running_session
+        while time.monotonic() < deadline and find_session():
             time.sleep(0.2)
-        if running_session():
+        if find_session():
             print("PulseDeck is still stopping.", file=sys.stderr)
             return 1
         print("PulseDeck stopped.")

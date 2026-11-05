@@ -24,3 +24,7 @@ auth.json
 settings.local.json
 playwright-report/
 test-results/
+.venv-desktop/
+build/
+dist/
+PulseDeck.exe

@@ -102,7 +102,7 @@ ANSI = {
     "dim": "\033[2m",
     "reset": "\033[0m",
 }
-COLOR_ENABLED = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+COLOR_ENABLED = bool(sys.stdout and sys.stdout.isatty()) and os.environ.get("NO_COLOR") is None
 
 
 def die(message: str, exit_code: int = 1) -> None:
@@ -116,7 +116,7 @@ def set_colour_mode(mode: str | None) -> None:
     elif mode == "never":
         COLOR_ENABLED = False
     else:
-        COLOR_ENABLED = sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+        COLOR_ENABLED = bool(sys.stdout and sys.stdout.isatty()) and os.environ.get("NO_COLOR") is None
 
 
 def colour(text: str, name: str) -> str:

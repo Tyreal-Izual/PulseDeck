@@ -6,12 +6,14 @@
 
 ## Windows 使用
 
-- 双击 **Start-PulseDeck.cmd**：后台启动并打开面板；再次双击会复用已运行的进程。
-- 双击 **Stop-PulseDeck.cmd**：停止后台进程。只关闭网页不会停止服务。
+- 双击 **PulseDeck.exe**：直接打开独立窗口，不需要终端或另开浏览器，也不需要单独安装 Python。
+- 再次双击会回到已有窗口；关闭窗口时停止桌面版自己的采集。
+- **Start-PulseDeck.cmd** 优先打开项目中的 EXE；没有 EXE 时使用原来的浏览器入口。
+- **Stop-PulseDeck.cmd** 可关闭桌面版，或停止浏览器版后台。
 - 双击 **Check-PulseDeck.cmd**：检查数据目录和运行环境。
 - 双击 **Setup-Claude-Capture.cmd**：安装 Claude Code 额度采集桥接；已有自定义 statusLine 时会保留，不会覆盖。
 
-需要 Python 3.10+。启动器支持已安装的 Python，也支持这台电脑上 Codex 自带的 Python。
+从源码使用浏览器入口需要 Python 3.10+。启动器支持已安装的 Python，也支持这台电脑上 Codex 自带的 Python。
 也可通过 `PULSEDECK_PYTHON` 指定解释器。不需要安装 pip 包或 Node.js。
 
 ## 第一版的范围
@@ -25,6 +27,7 @@ Radar 显示社区降智评测分数和原始测试时间，更新失败会保�
 程序只显示用量元数据；本地 token 统计不等于账单，也不代表其他电脑上的全部用量。
 
 缓存、运行状态和日志保存在 `%LOCALAPPDATA%\PulseDeck`，不会同步到 GitHub。
-当前使用本地网页作为初版界面，应用生命周期和采集模块已分离，方便后续增加桌面窗口或托盘。
+桌面版在独立窗口中复用现有界面，使用系统的 Microsoft Edge WebView2 Runtime。
+源码构建可运行 Build-Desktop.ps1，结果位于 dist/PulseDeck.exe；详见 [桌面版说明](docs/desktop.md)。
 
 详见 [完整说明](README.md) 和 [开发说明](docs/pulsedeck.md)。
