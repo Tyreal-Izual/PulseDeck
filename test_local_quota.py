@@ -87,6 +87,27 @@ class LocalQuotaTest(unittest.TestCase):
                 self.assertEqual(result['five_hour']['remaining_percentage'],75)
                 self.assertEqual(result['seven_day']['remaining_percentage'],60)
 
+    def test_damaged_quota_or_settings_do_not_hide_local_usage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory)
+            (home/'projects').mkdir()
+            (home/'projects'/'session.jsonl').write_text(json.dumps({
+                'type':'assistant', 'message':{'id':'m1','usage':{'input_tokens':10}}})+'\n',encoding='utf-8')
+            snapshot=home/'quota.json'
+            malformed=json.dumps({'captured_at_epoch':1e308, 'captured_at':True,
+                'claude_version':float('nan'), 'model':{'id':'example','unused':'PRIVATE_SENTINEL'},
+                'rate_limits':{'five_hour':{'used_percentage':10**1000,'resets_at':2**53-1},
+                               'seven_day':{'used_percentage':30}}}).encode()
+            for settings, content in ((b'{}',b'\xff'), (b'\xff',b'{}'), (b'{}',malformed)):
+                with self.subTest(settings=settings, content_size=len(content)):
+                    (home/'settings.json').write_bytes(settings)
+                    snapshot.write_bytes(content)
+                    result=claude_usage.collect_usage(home,snapshot_path=snapshot)
+                    self.assertEqual(result['local_usage']['token_totals']['total_tokens'],10)
+                    self.assertIsNone(result['rate_limits'].get('captured_at_unix_ms'))
+                    self.assertIsNone(result['rate_limits'].get('five_hour'))
+                    self.assertNotIn('PRIVATE_SENTINEL',json.dumps(result,allow_nan=False))
+
 
 @unittest.skipUnless(shutil.which('node'), 'Node.js is needed for quota rendering tests')
 class QuotaRendererTest(unittest.TestCase):

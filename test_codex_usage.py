@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 import subprocess
 import sys
 import tempfile
@@ -12,14 +13,13 @@ import codex_usage as codex
 from usage_common import CollectionError
 
 
-class SessionCacheTest(unittest.TestCase):
+class CodexLocalReportTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name)
         self.file = self.home / 'sessions/2026/10/05/test.jsonl'
         self.file.parent.mkdir(parents=True)
-        codex._SESSION_CACHE.clear()
 
     def row(self, total):
         return json.dumps({'payload': {'model': 'example-model', 'cwd': '/example',
@@ -33,19 +33,6 @@ class SessionCacheTest(unittest.TestCase):
         self.assertEqual(second['refresh']['bytes_read'], 0)
         self.assertEqual(first['final_token_totals_sum'], second['final_token_totals_sum'])
         self.assertEqual(first['final_token_totals_sum']['total_tokens'], 25)
-
-    def test_append_truncate_replace_and_delete_invalidate_cache(self):
-        for content, expected in [(self.row(10), 10), (self.row(10)+self.row(30), 30), (self.row(5), 5)]:
-            self.file.write_text(content)
-            self.assertEqual(codex.scan_sessions_metadata(self.home)['final_token_totals_sum']['total_tokens'], expected)
-        replacement = self.file.with_suffix('.tmp')
-        replacement.write_text(self.row(9))
-        replacement.replace(self.file)
-        self.assertEqual(codex.scan_sessions_metadata(self.home)['final_token_totals_sum']['total_tokens'], 9)
-        self.file.unlink()
-        result = codex.scan_sessions_metadata(self.home)
-        self.assertEqual(result['session_files'], 0)
-        self.assertFalse(codex._SESSION_CACHE)
 
     def test_bad_rows_and_nonfinite_tokens_do_not_discard_valid_history(self):
         self.file.write_text('not-json\n[]\n'+self.row(10)+'\n'+self.row(float('nan')))
@@ -66,12 +53,19 @@ class SessionCacheTest(unittest.TestCase):
             codex.collect_local_usage(self.home / 'missing', 10)
         self.assertIs(sys.stderr, original)
 
-    def test_export_output_directory_is_honoured(self):
+    def test_csv_export_contains_event_models_and_honours_output_directory(self):
         target = self.home / 'exports'
-        with patch.object(codex, 'export_json', return_value={'ok': True}):
-            result = codex.export_report('all', 'json', 10, 30, 7, output_dir=target)
+        self.file.write_text(json.dumps({'type':'token_usage_record', 'payload':{
+            'model':'example-model','response_id':'r1','usage':{'total_tokens':25}}})+'\n')
+        data = codex.collect_local_usage(self.home, 10)
+        with patch.object(codex, 'export_json', return_value=data):
+            result = codex.export_report('local-usage', 'csv', 10, 30, 7, output_dir=target)
         self.assertEqual(result.parent, target)
-        self.assertEqual(json.loads(result.read_text()), {'ok': True})
+        with result.open(encoding='utf-8', newline='') as handle:
+            models = [row for row in csv.DictReader(handle) if row['section']=='local_model_usage']
+        self.assertEqual(len(models), 1)
+        self.assertEqual(models[0]['model'], 'example-model')
+        self.assertEqual(models[0]['total_tokens'], '25')
 
     def test_cli_export_passes_output_option(self):
         args = codex.build_parser().parse_args(['export', '--output-dir', str(self.home)])

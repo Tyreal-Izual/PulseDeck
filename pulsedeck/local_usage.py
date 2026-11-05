@@ -27,7 +27,7 @@ def timestamp(value):
         if isinstance(value, (int, float)) and math.isfinite(value):
             return datetime.fromtimestamp(value, timezone.utc)
         if isinstance(value, str) and value.strip():
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
             return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
     except (ValueError, OSError, OverflowError):
         pass
@@ -52,6 +52,15 @@ def counts(value, source):
 
 def signature(usage):
     return tuple(sorted((usage or {}).items()))
+
+
+def merge_usage_records(first, second):
+    """Keep the fullest counters without erasing known attribution metadata."""
+    best, other = (first, second) if first["usage"]["total_tokens"] > second["usage"]["total_tokens"] else (second, first)
+    times = [row["timestamp"] for row in (first, second) if row["timestamp"] is not None]
+    return {**best, "timestamp": min(times) if times else None,
+            "model": best["model"] if best["model"] != UNKNOWN else other["model"],
+            "project": best["project"] or other["project"]}
 
 
 def short_project(value):
@@ -294,12 +303,9 @@ class ClaudeParser:
         old = self.rows.get(key)
         if old:
             self.duplicates += 1
-            # Streaming repeats may carry a later, more complete output counter.
-            if old["usage"]["total_tokens"] > row["usage"]["total_tokens"]:
-                row["usage"] = old["usage"]
-            if old["timestamp"] and row["timestamp"]:
-                row["timestamp"] = min(old["timestamp"], row["timestamp"])
-            row["project"] = row["project"] or old["project"]
+            if not obj.get("sessionId"):
+                row["session"] = old["session"]
+            row = merge_usage_records(old, row)
         self.rows[key] = row
 
     def records(self):
@@ -423,10 +429,7 @@ def aggregate(home: Path, source: str, top: int = 10, range_name: str = "all", a
                 old = records.get(row["key"])
                 if old:
                     duplicates += 1
-                    earliest = min(t for t in (old["timestamp"], row["timestamp"]) if t is not None) if old["timestamp"] or row["timestamp"] else None
-                    if old["usage"]["total_tokens"] > row["usage"]["total_tokens"]:
-                        row = old
-                    row = {**row, "timestamp": earliest}
+                    row = merge_usage_records(old, row)
                 records[row["key"]] = row
         selected = [r for r in records.values() if scope.includes(r["timestamp"])]
         result = summarize(selected, source, top, scope)

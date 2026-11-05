@@ -40,6 +40,11 @@ account endpoints. Keep the local-only transport guards, quota parsing/countdown
 incremental accounting, and runtime lifecycle regressions. Optional CLI adapters
 and their tests remain separate from the current dashboard.
 
+The old Radar IQ/cost composite and RadarBench adapters are retired. Tests cover
+only the current degradation source, plus rejection/recovery of old cache formats.
+Shared file-index append/truncate/replacement tests live in `test_local_usage.py`;
+collector tests retain their report-shape and CLI/export responsibilities.
+
 ## Planned later
 
 Tray/native presentation, configurable modules, notification thresholds,

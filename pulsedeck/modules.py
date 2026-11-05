@@ -12,7 +12,7 @@ class Module:
 
 MODULES = (
     Module("codex", "Codex", ("local-usage",),
-           "usage", 60, "Local token, model and session history. Account network queries are disabled."),
+           "usage", 15, "Local token, model and session history. Account network queries are disabled."),
     Module("claude", "Claude Code", ("claude-usage",),
            "usage", 15, "Local token history and captured subscription quotas."),
     Module("isambard", "Isambard", ("isambard-status",),

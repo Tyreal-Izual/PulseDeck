@@ -29,27 +29,6 @@ class ClaudeTranscriptTest(unittest.TestCase):
             self.assertEqual(result['token_totals']['total_tokens'], 20)
             self.assertEqual(result['parse_or_read_errors'], 1)
 
-    def test_cache_reuses_unchanged_and_refreshes_appended_files(self):
-        with tempfile.TemporaryDirectory() as directory:
-            home = Path(directory)
-            project = home / 'projects'
-            project.mkdir()
-            file = project/'one.jsonl'
-            row = {'type':'assistant','timestamp':'2026-10-05T00:00:00Z',
-                   'message':{'id':'1','usage':{'input_tokens':10}}}
-            file.write_text(json.dumps(row)+'\n')
-            first = claude_usage.aggregate_local_usage(home, 10, 30)
-            second = claude_usage.aggregate_local_usage(home, 10, 30)
-            self.assertGreater(first['refresh']['bytes_read'], 0)
-            self.assertEqual(second['refresh']['bytes_read'], 0)
-            row['message']['id'] = '2'
-            with file.open('a') as handle: handle.write(json.dumps(row)+'\n')
-            result = claude_usage.aggregate_local_usage(home, 10, 30)
-            self.assertEqual(result['refresh']['files_appended'], 1)
-            self.assertEqual(result['token_totals']['total_tokens'], 20)
-            file.unlink()
-            self.assertEqual(claude_usage.aggregate_local_usage(home, 10, 30)['unique_usage_records'], 0)
-
     def test_missing_projects_is_a_clean_empty_state(self):
         with tempfile.TemporaryDirectory() as directory:
             result = claude_usage.aggregate_local_usage(Path(directory), 10, 30)

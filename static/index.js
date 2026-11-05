@@ -18,7 +18,7 @@ __REFRESH_SCRIPT__
 
     const TEXT = {
       en: {
-        moduleUsage: "Usage", moduleStatus: "Service status", moduleScores: "Model scores",
+        moduleScores: "Model scores",
         appTitle: "PulseDeck",
         subtitle: "Local usage, service status, and model intelligence.",
         sourceDisabled: "Not enabled",
@@ -77,7 +77,6 @@ __REFRESH_SCRIPT__
         claudeFiveHour: "5-Hour Window",
         claudeWeekly: "7-Day Window",
         claudeSnapshotAge: "Snapshot Age",
-        claudeLoginWarningHint: "Run this command in Terminal, then wait for the next background refresh:",
         claudeSnapshotState: "Snapshot State",
         claudeCapture: "Usage Capture",
         claudeNotInstalled: "Not Installed",
@@ -103,7 +102,7 @@ __REFRESH_SCRIPT__
         unknown: "Unknown"
       },
       zh: {
-        moduleUsage: "用量", moduleStatus: "服务状态", moduleScores: "模型评测",
+        moduleScores: "模型评测",
         appTitle: "PulseDeck",
         subtitle: "AI 用量仅从本机读取，不查询账号接口；Isambard 与 Radar 继续使用公开数据。",
         sourceDisabled: "未启用",
@@ -216,6 +215,7 @@ __USAGE_SCRIPT__
     }
 
     function asNumber(value) {
+      if (value == null || typeof value === "boolean" || (typeof value === "string" && !value.trim())) return null;
       const number = Number(value);
       return Number.isFinite(number) ? number : null;
     }
@@ -701,13 +701,17 @@ __USAGE_SCRIPT__
       const target = window.location.hash === "#codex-radar"
         ? document.getElementById("codex-radar")
         : document.querySelector('[data-panel-id="codex-rate"]');
-      if (!target) return;
+      if (!target) {
+        if (!state.lastPayload?.pending?.length) state.initialPanelPositionPending = false;
+        return;
+      }
       const disclosure = target.closest("details");
       if (disclosure) disclosure.open = true;
       requestAnimationFrame(() => {
         if (!state.initialPanelPositionPending || !target.isConnected) return;
-        state.initialPanelPositionPending = false;
         target.scrollIntoView({block: "start", behavior: "instant"});
+        // Early partial results can leave too little page height to align the card.
+        state.initialPanelPositionPending = target.getBoundingClientRect().top > 1 && Boolean(state.lastPayload?.pending?.length);
       });
     }
 

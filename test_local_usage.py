@@ -103,11 +103,16 @@ class LocalUsageTest(unittest.TestCase):
         first = claude("m1", 1, "2026-11-04T12:00:00Z")
         final = claude("m1", 10)
         final["requestId"] = "added-later"
-        self.write([first, final, first], source="claude")
+        partial = {"type":"assistant", "message":{"id":"m1", "usage":{
+            "input_tokens":10, "output_tokens":15, "cache_read_input_tokens":20, "cache_creation_input_tokens":2}}}
+        self.write([first, final, first, partial], source="claude")
         self.write([final], source="claude", name="copy")
         result = self.collect("claude")
-        self.assertEqual(result["token_totals"]["total_tokens"], 42)
+        self.assertEqual(result["token_totals"]["total_tokens"], 47)
         self.assertEqual(result["unique_usage_records"], 1)
+        self.assertEqual(result["quality"]["unknown_date_tokens"], 0)
+        self.assertEqual(result["quality"]["unknown_model_tokens"], 0)
+        self.assertEqual(result["by_project"][0]["project"], "/project")
         self.assertEqual(self.collect("claude", "today")["token_totals"]["total_tokens"], 0)
 
     def test_calendar_ranges_apply_to_every_breakdown_for_both_sources(self):
@@ -126,10 +131,15 @@ class LocalUsageTest(unittest.TestCase):
                 self.assertEqual(sum(r["usage"]["total_tokens"] for r in result["top_sessions"]), total)
                 self.assertEqual(result["model_count"], number)
 
-    def test_cross_file_streaming_merge_preserves_earliest_date_in_either_order(self):
-        self.write([claude("m1", 10)], source="claude", name="a")
+    def test_cross_file_streaming_merge_preserves_known_metadata(self):
+        partial = claude("m1", 10)
+        del partial["message"]["model"]
+        del partial["cwd"]
+        self.write([partial], source="claude", name="a")
         self.write([claude("m1", 1, "2026-11-04T12:00:00Z")], source="claude", name="z")
         self.assertEqual(self.collect("claude")["token_totals"]["total_tokens"], 42)
+        self.assertEqual(self.collect("claude")["quality"]["unknown_model_tokens"], 0)
+        self.assertEqual(self.collect("claude")["by_project"][0]["project"], "/project")
         self.assertEqual(self.collect("claude", "today")["token_totals"]["total_tokens"], 0)
 
     def test_local_timezone_and_exact_calendar_boundaries(self):

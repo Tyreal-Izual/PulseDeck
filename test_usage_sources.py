@@ -41,11 +41,11 @@ class CollectionTest(unittest.TestCase):
         self.assertTrue(all(v.get('disabled') for k, v in data.items() if isinstance(v, dict)))
         for mock in (codex, claude, status): mock.assert_not_called()
 
-    def test_online_source_cache_is_shared_between_report_options(self):
+    def test_public_status_cache_is_shared_between_report_options(self):
         cache = sources.SourceCache()
-        with patch.object(web.codex_usage, 'collect_online_usage', return_value={'endpoints': {}}) as collect:
-            self.report('online-usage', source_cache=cache)
-            web.collect_report('online-usage', 20, 60, 7, '1d', None, [], False, False, source_cache=cache)
+        with patch.object(isambard_status, 'collect_status', return_value={'status': {}}) as collect:
+            self.report('isambard-status', source_cache=cache)
+            web.collect_report('isambard-status', 20, 60, 7, '1d', None, [], False, False, source_cache=cache)
         self.assertEqual(collect.call_count, 1)
 
     def test_local_cache_separates_ranges_and_calendar_anchor(self):

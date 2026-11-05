@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import shlex
 import sys
@@ -23,6 +22,8 @@ from pathlib import Path
 from typing import Any
 
 from usage_common import resolve_claude_home, resolve_snapshot_path
+from pulsedeck.local_usage import aggregate as aggregate_events, timestamp as parse_timestamp
+from pulsedeck.local_quota import number as finite_number
 
 
 TOTAL_FIELD = "total_tokens"
@@ -36,38 +37,14 @@ def local_now_text() -> str:
     return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z %z")
 
 
-def parse_timestamp(value: Any) -> datetime | None:
-    if isinstance(value, (int, float)) and math.isfinite(float(value)):
-        try:
-            return datetime.fromtimestamp(float(value), tz=timezone.utc)
-        except (OSError, OverflowError, ValueError):
-            return None
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed
-
-
 def local_timestamp_text(value: Any) -> str | None:
     parsed = parse_timestamp(value)
     if parsed is None:
         return None
-    return parsed.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z %z")
-
-
-def finite_number(value: Any) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    try:
+        return parsed.astimezone().strftime("%Y-%m-%d %H:%M:%S %Z %z")
+    except (ValueError, OSError, OverflowError):
         return None
-    number = float(value)
-    return number if math.isfinite(number) else None
-
-
-from pulsedeck.local_usage import aggregate as aggregate_events
 
 
 def aggregate_local_usage(claude_home: Path, top_n: int, days: int = 30, range_name: str = "all", anchor=None) -> dict[str, Any]:
@@ -94,7 +71,7 @@ def statusline_script_path() -> Path:
 
 def statusline_install_command() -> str:
     if sys.platform == "win32":
-        return str(Path(__file__).resolve().with_name("Setup-Claude-Capture.cmd"))
+        return str(statusline_script_path().with_name("Setup-Claude-Capture.cmd"))
     return " ".join(
         [shlex.quote(sys.executable), shlex.quote(str(statusline_script_path())), "--install"]
     )
@@ -104,7 +81,7 @@ def statusline_is_installed(claude_home: Path) -> bool:
     settings_path = claude_home / "settings.json"
     try:
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, ValueError):
         return False
     status_line = settings.get("statusLine") if isinstance(settings, dict) else None
     if not isinstance(status_line, dict):
@@ -126,7 +103,8 @@ def normalise_window(value: Any, now_epoch: float) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
     used = finite_number(value.get("used_percentage"))
-    resets_at = finite_number(value.get("resets_at"))
+    reset = parse_timestamp(value.get("resets_at"))
+    resets_at = reset.timestamp() if reset is not None else None
     if used is None and resets_at is None:
         return None
     out: dict[str, Any] = {}
@@ -158,7 +136,7 @@ def collect_rate_limits(claude_home: Path, snapshot_path: Path) -> dict[str, Any
         return base
     try:
         snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         base["reason"] = "snapshot_invalid"
         base["error"] = f"{type(exc).__name__}: {exc}"
         return base
@@ -167,10 +145,8 @@ def collect_rate_limits(claude_home: Path, snapshot_path: Path) -> dict[str, Any
         return base
 
     now_epoch = datetime.now(timezone.utc).timestamp()
-    captured_epoch = finite_number(snapshot.get("captured_at_epoch"))
-    if captured_epoch is None:
-        parsed = parse_timestamp(snapshot.get("captured_at"))
-        captured_epoch = parsed.timestamp() if parsed is not None else None
+    captured = parse_timestamp(snapshot.get("captured_at_epoch")) or parse_timestamp(snapshot.get("captured_at"))
+    captured_epoch = captured.timestamp() if captured is not None else None
     age = max(0, int(now_epoch - captured_epoch)) if captured_epoch is not None else None
     rate_limits = snapshot.get("rate_limits")
     rate_limits = rate_limits if isinstance(rate_limits, dict) else {}
@@ -186,13 +162,14 @@ def collect_rate_limits(claude_home: Path, snapshot_path: Path) -> dict[str, Any
     base.update(
         {
             "available": bool(five_hour or seven_day),
-            "captured_at": snapshot.get("captured_at"),
+            "captured_at": captured.isoformat() if captured is not None else None,
             "captured_at_unix_ms": int(captured_epoch * 1000) if captured_epoch is not None else None,
-            "captured_at_local": local_timestamp_text(snapshot.get("captured_at")),
+            "captured_at_local": local_timestamp_text(captured_epoch),
             "age_seconds": age,
             "stale": age is None or age > base["stale_after_seconds"],
-            "claude_version": snapshot.get("claude_version"),
-            "model": snapshot.get("model") if isinstance(snapshot.get("model"), dict) else {},
+            "claude_version": snapshot.get("claude_version") if isinstance(snapshot.get("claude_version"), str) else None,
+            "model": {k: v for k, v in snapshot.get("model", {}).items() if k in {"id", "display_name"} and isinstance(v, str)}
+                if isinstance(snapshot.get("model"), dict) else {},
             "five_hour": five_hour,
             "seven_day": seven_day,
         }
@@ -261,7 +238,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Read local Claude Code token and rate-limit usage.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of a short summary.")
     parser.add_argument("--top", type=int, default=10, help="Number of ranked rows to return.")
-    parser.add_argument("--days", type=int, default=30, help="Number of daily rows to return.")
+    parser.add_argument("--days", type=int, default=30, help="Maximum daily rows in CLI output; totals remain all-history.")
     parser.add_argument("--claude-home", type=Path, default=CLAUDE_HOME)
     parser.add_argument("--snapshot", type=Path, default=None)
     return parser
@@ -275,6 +252,7 @@ def main() -> None:
         days=max(1, args.days),
         snapshot_path=args.snapshot,
     )
+    data["local_usage"]["daily_usage"] = data["local_usage"]["daily_usage"][-max(1, args.days):]
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:

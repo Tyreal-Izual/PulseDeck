@@ -20,7 +20,6 @@ or secrets.
 from __future__ import annotations
 
 from usage_common import CollectionError, export_directory
-import threading
 import argparse
 import contextlib
 import csv
@@ -30,14 +29,13 @@ import math
 import os
 import re
 import shutil
-import sqlite3
 import sys
 import textwrap
 import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -734,126 +732,7 @@ def cmd_resets(args: argparse.Namespace) -> None:
         print_resets(data, warn_days=args.warn_days)
 
 
-def connect_sqlite_readonly(path: Path) -> sqlite3.Connection:
-    return sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
-
-
-def sqlite_threads_summary(codex_home: Path, top_n: int) -> dict[str, Any]:
-    candidates = [
-        codex_home / "state_5.sqlite",
-        codex_home / "sqlite" / "state_5.sqlite",
-    ]
-    summaries: list[dict[str, Any]] = []
-    for db_path in candidates:
-        if not db_path.exists():
-            continue
-        try:
-            con = connect_sqlite_readonly(db_path)
-            cur = con.cursor()
-            tables = {
-                row[0]
-                for row in cur.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
-            }
-            if "threads" not in tables:
-                con.close()
-                continue
-            cols = [row[1] for row in cur.execute("PRAGMA table_info(threads)")]
-            has_tokens = "tokens_used" in cols
-            has_model = "model" in cols
-            has_created = "created_at" in cols
-            has_updated = "updated_at" in cols
-            basic: dict[str, Any] = {
-                "database": str(db_path),
-                "rows": 0,
-                "tokens_used_sum": 0,
-                "tokens_used_max": 0,
-                "created_at_min": None,
-                "updated_at_max": None,
-                "by_model": [],
-            }
-            if has_tokens:
-                row = cur.execute(
-                    "SELECT COUNT(*), SUM(COALESCE(tokens_used, 0)), MAX(COALESCE(tokens_used, 0)) FROM threads"
-                ).fetchone()
-                basic["rows"] = int(row[0] or 0)
-                basic["tokens_used_sum"] = int(row[1] or 0)
-                basic["tokens_used_max"] = int(row[2] or 0)
-            else:
-                basic["rows"] = int(
-                    cur.execute("SELECT COUNT(*) FROM threads").fetchone()[0] or 0
-                )
-            if has_created:
-                basic["created_at_min"] = cur.execute(
-                    "SELECT MIN(created_at) FROM threads"
-                ).fetchone()[0]
-            if has_updated:
-                basic["updated_at_max"] = cur.execute(
-                    "SELECT MAX(updated_at) FROM threads"
-                ).fetchone()[0]
-                if basic["updated_at_max"] not in (None, ""):
-                    basic["updated_at_max_local"] = fmt_local_timestamp(
-                        basic["updated_at_max"]
-                    )
-                    basic["updated_at_unix_ms"] = unix_milliseconds(
-                        basic["updated_at_max"]
-                    )
-            if has_model and has_tokens:
-                for model, rows, tokens in cur.execute(
-                    """
-                    SELECT COALESCE(NULLIF(model, ''), '(blank)') AS model_name,
-                           COUNT(*) AS rows,
-                           SUM(COALESCE(tokens_used, 0)) AS tokens
-                    FROM threads
-                    GROUP BY COALESCE(NULLIF(model, ''), '(blank)')
-                    ORDER BY tokens DESC
-                    LIMIT ?
-                    """,
-                    (top_n,),
-                ):
-                    basic["by_model"].append(
-                        {
-                            "model": model,
-                            "threads": int(rows or 0),
-                            "tokens_used": int(tokens or 0),
-                        }
-                    )
-            con.close()
-            summaries.append(basic)
-        except sqlite3.Error as exc:
-            summaries.append(
-                {"database": str(db_path), "error": f"{type(exc).__name__}: {exc}"}
-            )
-    selected = next(
-        (
-            s
-            for s in summaries
-            if s.get("database", "").endswith("state_5.sqlite")
-            and "/sqlite/" not in s.get("database", "")
-        ),
-        None,
-    )
-    if selected is None and summaries:
-        selected = summaries[0]
-    return {"selected": selected, "all": summaries}
-
-
-def session_date_from_path(path: Path) -> str | None:
-    parts = path.parts
-    try:
-        idx = parts.index("sessions")
-        year, month, day = parts[idx + 1], parts[idx + 2], parts[idx + 3]
-        if len(year) == 4 and len(month) == 2 and len(day) == 2:
-            return f"{year}-{month}-{day}"
-    except (ValueError, IndexError):
-        return None
-    return None
-
-
-# Kept as a public cache alias for CLI/tests; the index stores usage metadata only.
-from pulsedeck.local_usage import CODEX_INDEX, aggregate as aggregate_events
-_SESSION_CACHE = CODEX_INDEX.entries
+from pulsedeck.local_usage import aggregate as aggregate_events
 
 
 def scan_sessions_metadata(codex_home: Path, top_n: int = 10, range_name: str = "all", anchor=None) -> dict[str, Any]:
@@ -885,7 +764,7 @@ def collect_local_usage(codex_home: Path, top_n: int, range_name: str = "all", a
         "retrieved_at_local": local_now_text(), "codex_home": str(codex_home),
         "network_calls_made": 0,
         "privacy_note": "Local usage events only; no conversation contents retained.",
-        "sqlite_threads": {"selected": None, "all": []},
+        "sqlite_threads": {"selected": None, "all": []},  # Older JSON schema compatibility.
         "sessions": sessions, "usage": usage, "rate_limits": rate_limits,
     }
 
@@ -921,23 +800,11 @@ def local_hints(
         hints.append(
             f"{len(high_sessions)} top session(s) are above {fmt_int(high_session_threshold)} total tokens."
         )
-    selected = (
-        local_data.get("sqlite_threads", {}).get("selected")
-        if isinstance(local_data.get("sqlite_threads"), dict)
-        else None
-    )
-    if selected and isinstance(selected.get("by_model"), list) and total_tokens:
-        top = selected["by_model"][0] if selected["by_model"] else None
-        if top:
-            share = (
-                int(top.get("tokens_used") or 0)
-                / max(1, int(selected.get("tokens_used_sum") or 1))
-                * 100
-            )
-            if share >= 90:
-                hints.append(
-                    f"Model {top.get('model')} dominates local usage at {share:.1f}% of SQLite tokens_used."
-                )
+    models = local_data.get("usage", {}).get("by_model", [])
+    if models and models[0].get("model") not in {"(unknown)", "__other__"}:
+        share = models[0].get("share", 0)
+        if share >= 90:
+            hints.append(f"Model {models[0]['model']} accounts for {share:.1f}% of recorded local tokens.")
     errors = (
         int(sessions.get("parse_or_read_errors") or 0)
         if isinstance(sessions, dict)
@@ -949,7 +816,6 @@ def local_hints(
 
 
 def print_local_usage(data: dict[str, Any], top: int, days: int) -> None:
-    selected = data["sqlite_threads"].get("selected")
     sessions = data["sessions"]
     section("Codex Local Usage Summary")
     explain(
@@ -2419,9 +2285,8 @@ def rows_for_csv(report: str, data: Any, top: int = 200) -> list[dict[str, Any]]
         sessions = local.get("sessions", {})
         for row in sessions.get("daily_usage", []):
             rows.append({"section": "daily_local_usage", **row})
-        selected = local.get("sqlite_threads", {}).get("selected") or {}
-        for row in selected.get("by_model", [])[:top]:
-            rows.append({"section": "sqlite_model_usage", **row})
+        for row in local.get("usage", {}).get("by_model", [])[:top]:
+            rows.append({"section": "local_model_usage", **row})
     if report in {"online-usage", "all"}:
         online = data if report == "online-usage" else data.get("online_usage", {})
         for name, item in online.get("endpoints", {}).items():
