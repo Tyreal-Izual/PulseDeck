@@ -597,7 +597,7 @@ class UsageWebHandler(BaseHTTPRequestHandler):
 
     def source_settings(self) -> dict[str, Any]:
         with self.server.sources_lock:
-            return {"sources": sorted(self.server.enabled_sources)}
+            return {"sources": sorted(self.server.enabled_sources), "accountNetworkEnabled": False}
 
     def radar_snapshot(self) -> dict[str, Any]:
         with self.server.sources_lock:

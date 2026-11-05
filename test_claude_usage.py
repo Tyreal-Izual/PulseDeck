@@ -30,7 +30,7 @@ class ClaudeAuthStatusTest(unittest.TestCase):
             patch.object(claude_usage, "claude_binary_path", return_value="/fake/claude"),
             patch.object(claude_usage.subprocess, "run", return_value=completed),
         ):
-            status = claude_usage.claude_auth_status()
+            status = claude_usage._query_claude_auth_status()
 
         self.assertEqual(status["logged_in"], False)
         self.assertEqual(status["requires_login"], True)
@@ -51,7 +51,7 @@ class ClaudeAuthStatusTest(unittest.TestCase):
             patch.object(claude_usage, "claude_binary_path", return_value="/fake/claude"),
             patch.object(claude_usage.subprocess, "run", return_value=completed),
         ):
-            status = claude_usage.claude_auth_status()
+            status = claude_usage._query_claude_auth_status()
 
         self.assertEqual(status["checked"], False)
         self.assertEqual(status["requires_login"], False)

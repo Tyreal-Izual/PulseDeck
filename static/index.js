@@ -20,7 +20,7 @@ __REFRESH_SCRIPT__
       en: {
         moduleUsage: "Usage", moduleStatus: "Service status", moduleScores: "Model scores",
         appTitle: "PulseDeck",
-        subtitle: "AI usage, infrastructure status, and model intelligence. In one local workspace.",
+        subtitle: "Local AI usage and captured snapshots. Isambard and Radar use public sources.",
         sourceDisabled: "Not enabled",
         setupSources: "No local sources detected. Sign in to Codex or Claude Code, then restart the dashboard. Use --check for setup diagnostics.",
         loadingSources: "Loading sources",
@@ -185,7 +185,7 @@ __REFRESH_SCRIPT__
       zh: {
         moduleUsage: "用量", moduleStatus: "服务状态", moduleScores: "模型评测",
         appTitle: "PulseDeck",
-        subtitle: "用量、基础设施状态与模型表现，在一个本地工作台中掌握。",
+        subtitle: "AI 用量仅从本机读取，不查询账号接口；Isambard 与 Radar 继续使用公开数据。",
         sourceDisabled: "未启用",
         setupSources: "未检测到本地数据源。请登录 Codex 或 Claude Code 后重启面板，可使用 --check 检查配置。",
         loadingSources: "正在加载数据源",
@@ -1199,7 +1199,7 @@ __REFRESH_SCRIPT__
       const disabled = [];
       for (const [name, value] of Object.entries(sections)) {
         if (value?.disabled) {
-          if (name !== "api" && (name !== "isambard" || report === "isambard-status")) disabled.push(value.source);
+          if (!value.local_only && name !== "api" && (name !== "isambard" || report === "isambard-status")) disabled.push(value.source);
           sections[name] = null;
         }
       }
@@ -1375,7 +1375,7 @@ __REFRESH_SCRIPT__
         if (revision !== state.sourceRevision) return;
         applySourceSettings(sourceSettings);
         await DashboardRefresh.run({report, days, sources: dashboardConfig.sources,
-          adminEnabled: dashboardConfig.adminEnabled, force: forceIsambardRefresh === true, signal: controller.signal}, payload => {
+          adminEnabled: dashboardConfig.adminEnabled, accountNetworkEnabled: dashboardConfig.accountNetworkEnabled, force: forceIsambardRefresh === true, signal: controller.signal}, payload => {
           // A result from the previous selection must never overwrite the new view.
           if ($("report").value !== report || revision !== state.sourceRevision || controller.signal.aborted) return;
           // Preserve completed sections during a refresh, replacing each as it arrives.

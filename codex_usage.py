@@ -436,6 +436,9 @@ def build_url(path_or_url: str) -> str:
 def fetch_json(
     path_or_url: str, access_token: str, account_id: str, timeout: int = 25
 ) -> dict[str, Any]:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED
+    if not ACCOUNT_NETWORK_ENABLED:
+        raise CollectionError("Account network access is disabled in local-only mode.")
     req = urllib.request.Request(
         build_url(path_or_url),
         headers={
@@ -475,6 +478,9 @@ def fetch_json(
 
 
 def admin_api_key() -> str | None:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED
+    if not ACCOUNT_NETWORK_ENABLED:
+        return None
     value = os.environ.get(ADMIN_KEY_ENV)
     return value.strip() if value and value.strip() else None
 
@@ -489,6 +495,9 @@ def build_admin_url(path: str, params: dict[str, Any]) -> str:
 def fetch_admin_json(
     path: str, params: dict[str, Any], admin_key: str, timeout: int = 25
 ) -> dict[str, Any]:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED
+    if not ACCOUNT_NETWORK_ENABLED:
+        raise CollectionError("Account network access is disabled in local-only mode.")
     req = urllib.request.Request(
         build_admin_url(path, params),
         headers={
@@ -568,6 +577,9 @@ def redact_admin(value: Any, key: str | None = None) -> Any:
 
 
 def collect_resets() -> dict[str, Any]:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED, unavailable
+    if not ACCOUNT_NETWORK_ENABLED:
+        return unavailable()
     from pulsedeck.codex_rpc import account_snapshot, resets_report
     snapshot = account_snapshot()
     if snapshot is not None:
@@ -1297,6 +1309,9 @@ def cmd_local_usage(args: argparse.Namespace) -> None:
 
 
 def collect_online_usage() -> dict[str, Any]:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED, unavailable
+    if not ACCOUNT_NETWORK_ENABLED:
+        return unavailable()
     from pulsedeck.codex_rpc import account_snapshot, online_report
     snapshot = account_snapshot()
     if snapshot is not None:
@@ -2271,6 +2286,9 @@ def admin_group_label(row: dict[str, Any], fields: list[str]) -> str:
 
 
 def collect_api_usage(args: argparse.Namespace) -> dict[str, Any]:
+    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED, unavailable
+    if not ACCOUNT_NETWORK_ENABLED:
+        return unavailable()
     key = admin_api_key()
     group_by = list(getattr(args, "group_by", []) or [])
     days = int(args.days)

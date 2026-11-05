@@ -1,9 +1,12 @@
-# PulseDeck 0.1 development
+# PulseDeck 0.2 development
+
+> Current policy (0.2): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. Earlier cloud-adapter notes below are historical and inactive.
 
 ## Boundaries
 
 - `pulsedeck/modules.py`: module catalog, data kinds, report identifiers and refresh policies.
-- `pulsedeck/codex_rpc.py`: bounded read-only app-server protocol, cached for 60 seconds.
+- `pulsedeck/privacy.py`: disables all account-network collection.
+- `pulsedeck/codex_rpc.py`: inactive app-server adapter; blocked by the local-only policy.
 - `pulsedeck/runtime.py`: loopback server lifecycle, authenticated control, OS single-instance lock.
 - `pulsedeck/__main__.py`: browser launcher, background process, diagnostics and stop commands.
 - Existing root collectors: metadata extraction, source caches, normalization, reports.

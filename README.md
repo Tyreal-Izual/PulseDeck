@@ -1,12 +1,14 @@
 # PulseDeck
 
+> Current policy (0.2): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. The disabled cloud adapters are retained only for possible future development.
+
 **Your local dashboard for AI usage, infrastructure status, and model intelligence.**
 
 PulseDeck runs on your Windows computer and brings together four independent modules:
 
 | Module | First release |
 | --- | --- |
-| Codex | Subscription quota windows, reset credits, local token/model/session history |
+| Codex | Local token/model/session history; no account-network queries |
 | Claude Code | Local token/model/project history; subscription quotas when a capture is available |
 | Isambard | Public service status and planned maintenance |
 | Radar | Current community degradation scores, source test period, cached fallback |
@@ -33,7 +35,7 @@ The default port is 8765; if occupied, the application selects an available loca
 
 ## Data sources and limitations
 
-- **Codex:** uses the documented app-server account read methods when the local client supports them. Existing read-only backend adapters are retained as fallback. Set `CODEX_BIN` for a custom CLI, or `PULSEDECK_CODEX_TRANSPORT=legacy` to use only the fallback.
+- **Codex:** reads local session metadata and the local thread database. Account network access is disabled in `pulsedeck/privacy.py`, including the app-server, legacy backend and Admin API paths. No cloud fallback is used.
 - **Claude:** local JSONL history is independent of subscription quota capture. The official statusLine supplies quotas only when a compatible Claude Code client invokes it with those fields. Claude Desktop may write history without invoking the bridge. Missing or stale quotas stay visibly unavailable/stale; browser refresh cannot create a new account snapshot. This release does not automate a hidden Claude conversation or port the macOS expect refresher.
 - **Isambard:** public service health and maintenance, not personal jobs or GPU allocations.
 - **Radar:** community assessment scores, not official model ratings. HTML/catalog changes can require adapter updates; failed updates keep the last valid snapshot and its original timestamp.

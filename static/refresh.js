@@ -54,7 +54,9 @@ const DashboardRefresh = (() => {
     const jobs = [];
     for (const name of names) {
       const [source] = definitions[name];
-      if (!settings.sources.includes(source) || (name === 'api_usage' && !settings.adminEnabled)) {
+      if (settings.accountNetworkEnabled === false && ['online_usage', 'reset_credits', 'api_usage'].includes(name)) {
+        data[name] = {ok: true, disabled: true, local_only: true, source};
+      } else if (!settings.sources.includes(source) || (name === 'api_usage' && !settings.adminEnabled)) {
         data[name] = {ok: true, disabled: true, source};
       } else {
         jobs.push(name);

@@ -422,6 +422,10 @@ def claude_binary_path() -> str | None:
 
 
 def claude_auth_status() -> dict[str, Any]:
+    return {"checked": False, "logged_in": None, "requires_login": False, "reason": "local_only"}
+
+
+def _query_claude_auth_status() -> dict[str, Any]:
     """Return a small, redacted view of ``claude auth status``."""
 
     binary = claude_binary_path()

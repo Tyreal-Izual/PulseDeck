@@ -29,6 +29,9 @@ def find_binary() -> Path | None:
 
 def read_account(binary: Path) -> dict:
     """Only initialize and account read methods; never starts a model turn."""
+    from .privacy import ACCOUNT_NETWORK_ENABLED
+    if not ACCOUNT_NETWORK_ENABLED:
+        raise RuntimeError("Account network access is disabled in local-only mode.")
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     process = subprocess.Popen(
         [str(binary), "app-server", "--listen", "stdio://"],
@@ -105,6 +108,9 @@ def read_account(binary: Path) -> dict:
 
 def account_snapshot() -> dict | None:
     global _cached, _expires
+    from .privacy import ACCOUNT_NETWORK_ENABLED
+    if not ACCOUNT_NETWORK_ENABLED:
+        return None
     if os.environ.get("PULSEDECK_CODEX_TRANSPORT", "auto") == "legacy":
         return None
     with _lock:
