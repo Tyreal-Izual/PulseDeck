@@ -393,6 +393,8 @@ def statusline_script_path() -> Path:
 
 
 def statusline_install_command() -> str:
+    if sys.platform == "win32":
+        return str(Path(__file__).resolve().with_name("Setup-Claude-Capture.cmd"))
     return " ".join(
         [shlex.quote(sys.executable), shlex.quote(str(statusline_script_path())), "--install"]
     )
@@ -408,7 +410,10 @@ def statusline_is_installed(claude_home: Path) -> bool:
     if not isinstance(status_line, dict):
         return False
     command = str(status_line.get("command") or "")
-    return str(statusline_script_path()) in command
+    normalized = command.replace("\\", "/")
+    script = statusline_script_path()
+    return any(path.as_posix() in normalized for path in (
+        script, script.parent / "scripts" / "capture-claude.ps1"))
 
 
 def claude_binary_path() -> str | None:
@@ -432,7 +437,8 @@ def claude_auth_status() -> dict[str, Any]:
             [binary, "auth", "status"],
             check=False,
             capture_output=True,
-            text=True,
+            text=True, encoding="utf-8",
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             timeout=CLAUDE_AUTH_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:

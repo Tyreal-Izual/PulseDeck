@@ -11,7 +11,9 @@ from typing import Any, Callable
 
 from usage_common import export_directory, find_claude_binary, resolve_claude_home, resolve_snapshot_path
 
-SOURCES = frozenset({"codex", "claude", "isambard", "radar"})
+from pulsedeck.modules import SOURCE_IDS
+
+SOURCES = SOURCE_IDS
 
 
 def resolve_sources(value: str, codex_home: Path) -> frozenset[str]:

@@ -15,7 +15,7 @@ class ProgressiveRefreshTest(unittest.TestCase):
     def run_js(self, code):
         script = Path(__file__).with_name('static').joinpath('refresh.js').read_text(encoding='utf-8')
         result = subprocess.run([shutil.which('node')], input=script+'\n'+code,
-                                text=True, capture_output=True, timeout=10, check=True)
+                                text=True, encoding="utf-8", capture_output=True, timeout=10, check=True)
         return json.loads(result.stdout)
 
     def test_fast_local_results_arrive_before_slow_online_and_force_only_isambard(self):
@@ -105,6 +105,6 @@ class ProgressiveRefreshTest(unittest.TestCase):
             self.assertTrue(scripts)
             for script in scripts:
                 result = subprocess.run([shutil.which('node'), '--check'], input=script,
-                                        text=True, capture_output=True, timeout=5)
+                                        text=True, encoding="utf-8", capture_output=True, timeout=5)
                 self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotRegex(html, r'__[A-Z_]+__')

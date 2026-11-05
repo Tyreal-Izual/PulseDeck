@@ -10,3 +10,17 @@ codex_*_report_*.json
 codex_*_report_*.csv
 codex_*_report_*.txt
 exports/
+
+# PulseDeck machine-local state
+.env
+.env.*
+!.env.example
+.local/
+.runtime/
+.venv/
+*.log
+run.json
+auth.json
+settings.local.json
+playwright-report/
+test-results/

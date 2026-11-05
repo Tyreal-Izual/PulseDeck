@@ -848,3 +848,15 @@ __RADAR_STYLE__
     }
     .return-to-limits:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
     body.has-return-to-limits .shell { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+
+    /* PulseDeck workspace shell; collection and rendering remain independent. */
+    .brand-label { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .15em; margin-bottom: 8px; }
+    .brand-label span { padding: 2px 7px; border: 1px solid var(--line); border-radius: 20px; color: var(--muted); letter-spacing: 0; }
+    h1 { font-size: 36px; letter-spacing: -.04em; }
+    .module-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0 0 20px; }
+    .module-nav a { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); text-decoration: none; font-weight: 650; transition: border-color .15s; }
+    .module-nav a:hover, .module-nav a:focus-visible { border-color: var(--accent); }
+    .module-nav small { width: 100%; padding-left: 16px; color: var(--muted); font-size: 11px; font-weight: 400; }
+    .module-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .claude-dot { background: #d8a084; } .isambard-dot { background: #90b3f6; } .radar-dot { background: #c6a5ee; }
+    @media (max-width: 650px) { .module-nav { grid-template-columns: repeat(2, 1fr); } .module-nav a { padding: 12px; } }

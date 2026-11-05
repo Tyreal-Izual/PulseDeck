@@ -27,7 +27,7 @@ def resolve_snapshot_path(home: Path | None = None) -> Path:
 
 
 def cache_directory() -> Path:
-    configured = os.environ.get("CODEX_USAGE_CACHE_DIR")
+    configured = os.environ.get("PULSEDECK_CACHE_DIR") or os.environ.get("CODEX_USAGE_CACHE_DIR")
     if configured:
         return Path(configured).expanduser()
     if sys.platform == "darwin":
@@ -36,12 +36,12 @@ def cache_directory() -> Path:
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     else:
         base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    return base / "codex-usage"
+    return base / "PulseDeck" / "cache" if sys.platform == "win32" else base / "pulsedeck"
 
 
 def export_directory() -> Path:
     return Path(os.environ.get("CODEX_USAGE_EXPORT_DIR") or
-                Path.home() / "Downloads" / "codex-usage").expanduser()
+                Path.home() / "Downloads" / "PulseDeck").expanduser()
 
 
 def atomic_write_json(path: Path, payload: Any) -> None:
@@ -72,7 +72,8 @@ def ssl_context() -> ssl.SSLContext:
 
 def find_claude_binary(explicit: Path | None = None) -> Path | None:
     candidates = [explicit, os.environ.get("CLAUDE_BIN"), shutil.which("claude"),
-                  Path.home() / ".local/bin/claude", "/opt/homebrew/bin/claude",
+                  Path.home() / ".local/bin/claude.exe", Path.home() / ".local/bin/claude",
+                  Path.home() / "AppData/Roaming/npm/claude.cmd", "/opt/homebrew/bin/claude",
                   "/usr/local/bin/claude"]
     for candidate in candidates:
         if candidate:

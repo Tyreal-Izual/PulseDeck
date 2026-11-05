@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Codex &amp; Claude Code Usage Dashboard</title>
+  <title>PulseDeck</title>
   <style>
 __CSS__
 </style>
@@ -12,7 +12,8 @@ __CSS__
   <main class="shell">
     <header>
       <div>
-        <h1 data-i18n="appTitle">Codex &amp; Claude Code Usage Dashboard</h1>
+        <div class="brand-label">LOCAL WORKSPACE <span>v0.1</span></div>
+        <h1 data-i18n="appTitle">PulseDeck</h1>
         <p class="subtitle" data-i18n="subtitle">A local-only view of Codex and Claude Code rate limits and token usage.</p>
       </div>
       <div class="status" aria-live="polite">
@@ -53,6 +54,12 @@ __CSS__
       <button id="refresh-now" type="button" data-i18n="refresh">Refresh</button>
     </div>
 
+    <nav class="module-nav" aria-label="Modules">
+      <a href="/?report=codex-usage"><span class="module-dot"></span>Codex <small data-i18n="moduleUsage">Usage</small></a>
+      <a href="/?report=claude-usage"><span class="module-dot claude-dot"></span>Claude <small data-i18n="moduleUsage">Usage</small></a>
+      <a href="/?report=isambard-status"><span class="module-dot isambard-dot"></span>Isambard <small data-i18n="moduleStatus">Service status</small></a>
+      <a href="/?report=all#codex-radar"><span class="module-dot radar-dot"></span>Radar <small data-i18n="moduleScores">Model scores</small></a>
+    </nav>
     <div id="notice" class="notice"></div>
     <div id="sections" class="sections"></div>
   </main>

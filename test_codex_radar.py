@@ -806,7 +806,7 @@ class RadarRendererTest(unittest.TestCase):
         end = radar.SCRIPT.index("      function render()")
         return subprocess.run(
             [shutil.which("node")], input=radar.SCRIPT[start:end] + "\n" + script,
-            text=True, capture_output=True, check=True, timeout=5,
+            text=True, encoding="utf-8", capture_output=True, check=True, timeout=5,
         ).stdout
 
     def test_score_meters_use_fixed_150_scale_not_family_maximum(self):

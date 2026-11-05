@@ -10,23 +10,24 @@ __REFRESH_SCRIPT__
       pendingRefresh: false,
       pendingForceRefresh: false,
       lastPayload: null,
-      initialPanelPositionPending: !window.location.hash,
-      lang: localStorage.getItem("codexUsageLanguage") || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en")
+      initialPanelPositionPending: window.location.hash === "#codex-radar",
+      lang: localStorage.getItem("pulsedeckLanguage") || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en")
     };
 
     const $ = (id) => document.getElementById(id);
 
     const TEXT = {
       en: {
-        appTitle: "Codex & Claude Code Usage Dashboard",
-        subtitle: "A local-only view of Codex and Claude Code rate limits and token usage.",
+        moduleUsage: "Usage", moduleStatus: "Service status", moduleScores: "Model scores",
+        appTitle: "PulseDeck",
+        subtitle: "AI usage, infrastructure status, and model intelligence. In one local workspace.",
         sourceDisabled: "Not enabled",
         setupSources: "No local sources detected. Sign in to Codex or Claude Code, then restart the dashboard. Use --check for setup diagnostics.",
         loadingSources: "Loading sources",
         statusStarting: "Starting",
         statusWaiting: "Waiting for the first refresh.",
         report: "Report",
-        reportAll: "Overview: Codex + Claude Code",
+        reportAll: "Workspace overview",
         backToLimits: "Back to limits",
         reportCodex: "Codex Usage",
         reportClaude: "Claude Code Usage",
@@ -60,7 +61,7 @@ __REFRESH_SCRIPT__
         more: "More",
         totalTokens: "Total Tokens",
         resetCredits: "Codex Reset Credits",
-        resetSubtitle: "Read-only Codex reset endpoint",
+        resetSubtitle: "Available earned resets",
         retrieved: "Retrieved",
         updated: "Updated",
         availableResets: "Available Resets",
@@ -89,7 +90,7 @@ __REFRESH_SCRIPT__
         project: "Project",
         sessionFile: "Session File",
         onlineRateLimits: "Codex Online Rate Limits",
-        onlineSubtitle: "Read-only backend endpoints",
+        onlineSubtitle: "Read-only account quota data",
         primaryWindow: "Primary Window",
         weeklyWindow: "Weekly Window",
         primaryHint: "Available before the primary limit is reached",
@@ -146,7 +147,9 @@ __REFRESH_SCRIPT__
         claudeStatusLine: "statusLine",
         claudeUsageCommand: "Background /usage",
         claudeSetupTitle: "Claude rate-limit capture is not ready",
-        claudeSetupHint: "Run this command once, then complete one Claude Code response:",
+        claudeSetupHint: "On Windows, double-click Setup-Claude-Capture.cmd in the project folder, then complete a response in a compatible Claude Code client.",
+        claudeWaitingTitle: "Quota capture configured · waiting for data",
+        claudeWaitingHint: "Local token history is available. Quotas appear after a compatible Claude Code client supplies a snapshot; Claude Desktop may not invoke the capture. Missing values are not zero usage.",
         claudeLocalTokens: "Claude Code Local Token Totals",
         claudeLocalSubtitle: "Deduplicated assistant usage records from local JSONL files",
         cacheCreationTokens: "Cache Creation Tokens",
@@ -180,15 +183,16 @@ __REFRESH_SCRIPT__
         unknown: "Unknown"
       },
       zh: {
-        appTitle: "Codex 与 Claude Code 用量仪表盘",
-        subtitle: "在同一个本地网页中查看 Codex 与 Claude Code 的限额和 token 用量。",
+        moduleUsage: "用量", moduleStatus: "服务状态", moduleScores: "模型评测",
+        appTitle: "PulseDeck",
+        subtitle: "用量、基础设施状态与模型表现，在一个本地工作台中掌握。",
         sourceDisabled: "未启用",
         setupSources: "未检测到本地数据源。请登录 Codex 或 Claude Code 后重启面板，可使用 --check 检查配置。",
         loadingSources: "正在加载数据源",
         statusStarting: "正在启动",
         statusWaiting: "等待第一次刷新。",
         report: "报告",
-        reportAll: "总览：Codex + Claude Code",
+        reportAll: "工作台总览",
         backToLimits: "返回在线限额",
         reportCodex: "Codex 用量",
         reportClaude: "Claude Code 用量",
@@ -222,7 +226,7 @@ __REFRESH_SCRIPT__
         more: "多",
         totalTokens: "总 token",
         resetCredits: "Codex 重置额度",
-        resetSubtitle: "只读 Codex 重置额度接口",
+        resetSubtitle: "可用的累积重置额度",
         retrieved: "获取时间",
         updated: "更新时间",
         availableResets: "可用重置次数",
@@ -251,7 +255,7 @@ __REFRESH_SCRIPT__
         project: "项目",
         sessionFile: "Session 文件",
         onlineRateLimits: "Codex 在线速率限制",
-        onlineSubtitle: "只读后端接口",
+        onlineSubtitle: "只读账号额度信息",
         primaryWindow: "Primary 窗口",
         weeklyWindow: "Weekly 窗口",
         primaryHint: "距离 primary 限制前仍可使用的比例",
@@ -308,7 +312,9 @@ __REFRESH_SCRIPT__
         claudeStatusLine: "statusLine",
         claudeUsageCommand: "后台 /usage",
         claudeSetupTitle: "Claude 限额采集尚未就绪",
-        claudeSetupHint: "请运行一次下面的命令，然后让 Claude Code 完成一次回复：",
+        claudeSetupHint: "Windows 用户可双击项目中的 Setup-Claude-Capture.cmd，然后在兼容的 Claude Code 客户端中完成一次回复。",
+        claudeWaitingTitle: "额度采集已配置 · 等待数据",
+        claudeWaitingHint: "本地 token 历史可正常查看。额度需要兼容的 Claude Code 客户端生成快照；Claude Desktop 可能不会触发采集。暂无数据不代表用量为零。",
         claudeLocalTokens: "Claude Code 本地 token 总量",
         claudeLocalSubtitle: "从本地 JSONL 去重得到的 assistant 用量记录",
         cacheCreationTokens: "缓存创建 token",
@@ -1002,9 +1008,9 @@ __REFRESH_SCRIPT__
       }
       const setup = rate.available && captureReady ? "" : `
         <div class="setup-callout">
-          <strong>${esc(t("claudeSetupTitle"))}</strong>
-          <span>${esc(t("claudeSetupHint"))}</span>
-          <code class="setup-command mono">${esc(rate.install_command || "python3 claude_usage_statusline.py --install")}</code>
+          <strong>${esc(t(captureReady ? "claudeWaitingTitle" : "claudeSetupTitle"))}</strong>
+          <span>${esc(t(captureReady ? "claudeWaitingHint" : "claudeSetupHint"))}</span>
+          ${captureReady ? "" : '<code class="setup-command mono">Setup-Claude-Capture.cmd</code>'}
         </div>`;
       const loginWarning = requiresLogin ? `
         <div class="setup-callout setup-callout--bad">
@@ -1145,7 +1151,8 @@ __REFRESH_SCRIPT__
       const snapshot = isambard.status || {};
       const statuses = Array.isArray(snapshot.statuses) ? snapshot.statuses : [];
       const source = isambard.source === "live" ? "live" : "cache";
-      const rows = Array.isArray(snapshot.maintenance_rows) ? snapshot.maintenance_rows : [];
+      const rows = (Array.isArray(snapshot.maintenance_rows) ? snapshot.maintenance_rows : [])
+        .filter(row => !(String(row[0] || "").trim().toLowerCase() === "no planned maintenance" && row.slice(1).every(cell => !String(cell || "").trim())));
       const maintenanceLabel = rows.length === 1 ? t("maintenanceWindow") : t("maintenanceWindows");
       const headerExtras = [
         { label: t("cacheAge"), value: source === "cache" ? fmtDurationSeconds(isambard.cache_age_seconds) : "-" },
@@ -1299,7 +1306,7 @@ __REFRESH_SCRIPT__
         state.initialPanelPositionPending = false;
         return;
       }
-      const target = document.querySelector('[data-panel-id="codex-rate"]');
+      const target = document.getElementById("codex-radar");
       if (!target) return;
       requestAnimationFrame(() => {
         if (!state.initialPanelPositionPending || !target.isConnected) return;
@@ -1435,7 +1442,7 @@ __REFRESH_SCRIPT__
     $("auto").addEventListener("change", schedule);
     $("language").addEventListener("change", () => {
       state.lang = $("language").value === "zh" ? "zh" : "en";
-      localStorage.setItem("codexUsageLanguage", state.lang);
+      localStorage.setItem("pulsedeckLanguage", state.lang);
       applyLanguage();
       if (state.lastPayload) {
         render(state.lastPayload);

@@ -568,6 +568,12 @@ def redact_admin(value: Any, key: str | None = None) -> Any:
 
 
 def collect_resets() -> dict[str, Any]:
+    from pulsedeck.codex_rpc import account_snapshot, resets_report
+    snapshot = account_snapshot()
+    if snapshot is not None:
+        report = resets_report(snapshot)
+        if report is not None:
+            return report
     access_token, account_id = load_auth()
     response = fetch_json("/wham/rate-limit-reset-credits", access_token, account_id)
     retrieved_at = datetime.now().astimezone()
@@ -717,7 +723,7 @@ def cmd_resets(args: argparse.Namespace) -> None:
 
 
 def connect_sqlite_readonly(path: Path) -> sqlite3.Connection:
-    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    return sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
 
 
 def sqlite_threads_summary(codex_home: Path, top_n: int) -> dict[str, Any]:
@@ -1291,6 +1297,10 @@ def cmd_local_usage(args: argparse.Namespace) -> None:
 
 
 def collect_online_usage() -> dict[str, Any]:
+    from pulsedeck.codex_rpc import account_snapshot, online_report
+    snapshot = account_snapshot()
+    if snapshot is not None:
+        return online_report(snapshot)
     access_token, account_id = load_auth()
     retrieved_at = datetime.now().astimezone()
     out: dict[str, Any] = {

@@ -26,6 +26,13 @@ def snapshot_path() -> Path:
 
 
 def command_text() -> str:
+    if sys.platform == "win32":
+        # Both Git Bash and PowerShell accept a powershell -File launcher with forward paths.
+        import subprocess
+        bridge = Path(__file__).resolve().parent / "scripts" / "capture-claude.ps1"
+        return subprocess.list2cmdline(["powershell.exe", "-NoLogo", "-NoProfile",
+            "-ExecutionPolicy", "Bypass", "-File", bridge.as_posix(),
+            "-Python", Path(sys.executable).as_posix()])
     return " ".join((shlex.quote(sys.executable), shlex.quote(str(Path(__file__).resolve()))))
 
 
@@ -133,7 +140,10 @@ def load_settings(path: Path) -> dict[str, Any]:
 def is_ours(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
-    return str(Path(__file__).resolve()) in str(value.get("command") or "")
+    command = str(value.get("command") or "").replace("\\", "/")
+    root = Path(__file__).resolve().parent
+    return any(path.as_posix() in command for path in (
+        Path(__file__).resolve(), root / "scripts" / "capture-claude.ps1"))
 
 
 def install(force: bool) -> None:

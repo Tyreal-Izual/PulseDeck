@@ -129,7 +129,7 @@ class UsageWebSecurityTest(unittest.TestCase):
         status, _, body = self.request("/", cookie=cookie)
 
         self.assertEqual(status, 200)
-        self.assertIn(b"Codex &amp; Claude Code Usage", body)
+        self.assertIn(b"<title>PulseDeck</title>", body)
 
     def test_admin_limit_is_capped_before_collection(self) -> None:
         cookie = self.session_cookie()
