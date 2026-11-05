@@ -14,7 +14,7 @@ Object.assign(TEXT.en, {
   codexQuota: "Codex · Remaining quota", quotaLocal: "Local quota snapshot", quotaNotReported: "Not provided in the local snapshot",
   quotaResetWaiting: "Reset time reached; awaiting a new snapshot", quotaNoSnapshot: "No quota snapshot", quotaFresh: "Recent snapshot", quotaStale: "Snapshot is stale",
   rangePublicNote: "Time range applies to local token history. Public service status and Radar show their latest snapshots.",
-  trendBucket: "days per bar", currentSnapshot: "Latest snapshot", cacheWriteTokens: "Cache write input (detail)"
+  trendBucket: "days per bar", cacheWriteTokens: "Cache write input (detail)"
 });
 Object.assign(TEXT.zh, {
   timeRange: "时间范围", rangeToday: "今天", range7d: "近 7 天", range30d: "近 30 天", rangeAll: "全部本地历史",
@@ -31,7 +31,7 @@ Object.assign(TEXT.zh, {
   codexQuota: "Codex · 剩余额度", quotaLocal: "本地额度快照", quotaNotReported: "本地快照未提供此窗口",
   quotaResetWaiting: "已到重置时间，等待新快照", quotaNoSnapshot: "暂无额度快照", quotaFresh: "近期快照", quotaStale: "快照已过期",
   rangePublicNote: "时间筛选适用于本地 Token 历史；服务状态和 Radar 显示最新快照。",
-  trendBucket: "天 / 柱", currentSnapshot: "最新快照", cacheWriteTokens: "缓存写入输入（细项）"
+  trendBucket: "天 / 柱", cacheWriteTokens: "缓存写入输入（细项）"
 });
 
 function rangeLabel(range) {
@@ -94,7 +94,7 @@ function renderUsage(usage, source, overview = false) {
   const head = `<div class="usage-total">${trackedNumber(`${source}.total`, total)}<span>Tokens</span></div>
     <div class="usage-meta">${esc(fmtNumber(usage.session_count || 0))} ${esc(t("sessions"))}<span>·</span>${esc(fmtNumber(usage.model_count || 0))} ${esc(t("models"))}</div>`;
   const modelRows = (overview ? models.slice(0, 3) : models).map((row, i) => [
-    sqliteModelKey(modelLabel(row.model), i), trackedModelNumber(source, row.model, "tokens", row.total_tokens), esc(fmtPercent(row.share))
+    modelKey(modelLabel(row.model), i), trackedModelNumber(source, row.model, "tokens", row.total_tokens), esc(fmtPercent(row.share))
   ]);
   const modelTable = table([t("model"), t("totalTokens"), t("share")], modelRows, [1, 2]);
   const link = `/?report=${source === "codex" ? "codex-usage" : "claude-usage"}&range=${encodeURIComponent(usage.scope?.range || "30d")}`;
@@ -119,6 +119,30 @@ function renderUsage(usage, source, overview = false) {
 function collapsePanel(item, id, label) {
   if (!item) return null;
   return {title:id, wide:true, html:`<details class="collapsed-panel" data-disclosure="${id}"><summary>${esc(label)}</summary>${item.html}</details>`};
+}
+
+function limitLeft(usedValue) {
+  if (usedValue == null || usedValue === "" || typeof usedValue === "boolean") return null;
+  const used = asNumber(usedValue);
+  return used === null ? null : Math.max(0, Math.min(100, 100 - used));
+}
+
+function leftBar(label, usedValue, hint, footer = "", changeKey = "") {
+  const left = limitLeft(usedValue);
+  const percent = left === null ? 0 : left;
+  const tone = left !== null && left <= 10 ? "bad" : left !== null && left <= 25 ? "warn" : "";
+  const numberHtml = left === null ? "-" : changeKey
+    ? trackedNumber(changeKey, left, `${left.toFixed(1)}%`) : esc(`${left.toFixed(1)}%`);
+  const valueHtml = left === null ? "-" : state.lang === "zh" ? `${esc(t("left"))} ${numberHtml}` : `${numberHtml} ${esc(t("left"))}`;
+  return `
+    <div class="barbox">
+      <div class="barhead"><span>${esc(label)}</span><span>${valueHtml}</span></div>
+      <div class="track"><div class="fill ${tone}" style="width: ${percent}%"></div></div>
+      <div class="bar-meta">
+        <span class="subtle">${esc(hint || "")}</span>
+        ${footer ? `<span class="bar-reset">${esc(footer)}</span>` : ""}
+      </div>
+    </div>`;
 }
 
 function quotaCountdown(reset, now = Date.now()) {
@@ -176,7 +200,7 @@ function updateQuotaClocks() {
   });
 }
 
-function renderCodexQuota(local, overview = false) {
+function renderCodexQuota(local) {
   const rate = local?.rate_limits;
   if (!rate) return [];
   const extras = [
@@ -185,5 +209,5 @@ function renderCodexQuota(local, overview = false) {
     ...(rate.plan_type ? [{label:t("plan"), value:rate.plan_type}] : [])
   ];
   const bars = `<div class="bars quota-bars">${quotaBar("codex", "five_hour", rate.five_hour, t("claudeFiveHour"))}${quotaBar("codex", "seven_day", rate.seven_day, t("claudeWeekly"))}</div>`;
-  return [panel(t("codexQuota"), t("quotaLocal"), bars, !overview, "codex-rate", extras)];
+  return [panel(t("codexQuota"), t("quotaLocal"), bars, true, "codex-rate", extras)];
 }

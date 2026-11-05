@@ -81,7 +81,7 @@ class LocalQuotaTest(unittest.TestCase):
                 path.write_text(json.dumps({**captured,'rate_limits':{
                     'five_hour':{'used_percentage':25,'resets_at':self.captured.timestamp()+3600},
                     'seven_day':{'used_percentage':40,'resets_at':self.captured.timestamp()+86400}}}),encoding='utf-8')
-                with patch('socket.socket',side_effect=AssertionError('network')), patch.object(claude_usage.subprocess,'run',side_effect=AssertionError('client')):
+                with patch('socket.socket',side_effect=AssertionError('network')), patch('subprocess.run',side_effect=AssertionError('client')):
                     result=claude_usage.collect_rate_limits(home,path)
                 self.assertEqual(result['captured_at_unix_ms'],int(self.captured.timestamp()*1000))
                 self.assertEqual(result['five_hour']['remaining_percentage'],75)
@@ -92,14 +92,12 @@ class LocalQuotaTest(unittest.TestCase):
 class QuotaRendererTest(unittest.TestCase):
     def test_countdown_ticks_and_expired_or_missing_quota_never_becomes_full(self):
         root=Path(__file__).parent
-        index=(root/'static/index.js').read_text(encoding='utf-8')
-        bars=index[index.index('    function limitLeft('):index.index('    function hasRateLimitWindow(')]
         script='''
         const TEXT={en:{resetsIn:'Resets in',day:'day',left:'left'},zh:{}},state={lang:'en'};
         const t=k=>TEXT.en[k]||k,esc=v=>String(v??''),asNumber=v=>Number.isFinite(Number(v))?Number(v):null;
         const trackedNumber=(key,value,display)=>display??value;
         Date.now=()=>1000000;
-        '''+bars+(root/'static/usage.js').read_text(encoding='utf-8')+'''
+        '''+(root/'static/usage.js').read_text(encoding='utf-8')+'''
         const current=quotaBar('codex','five_hour',{used_percentage:30,resets_at:1005},'5h');
         const expired=quotaBar('codex','five_hour',{used_percentage:30,resets_at:999},'5h');
         const unknown=quotaBar('claude','five_hour',null,'5h');

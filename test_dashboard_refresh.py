@@ -18,45 +18,45 @@ class ProgressiveRefreshTest(unittest.TestCase):
                                 text=True, encoding="utf-8", capture_output=True, timeout=10, check=True)
         return json.loads(result.stdout)
 
-    def test_fast_local_results_arrive_before_slow_online_and_force_only_isambard(self):
+    def test_fast_local_results_arrive_before_slow_public_status_and_force_only_isambard(self):
         result = self.run_js('''
         const requests = [], updates = [];
-        let finishOnline;
-        const blocked = new Promise(resolve => finishOnline = resolve);
+        let finishPublic;
+        const blocked = new Promise(resolve => finishPublic = resolve);
         global.fetch = async (url, options) => {
           const report = new URL(url, 'http://local').searchParams.get('report');
           requests.push({report, method:options.method || 'GET', headers:options.headers});
-          if (report === 'online-usage') await blocked;
+          if (report === 'isambard-status') await blocked;
           return {ok:true,status:200,json:async()=>({ok:true,data:{report}})};
         };
         const promise = DashboardRefresh.run({report:'all',days:'30',sources:['codex','claude','isambard'],force:true}, p => {
           updates.push(JSON.parse(JSON.stringify(p)));
-          if (p.data.local_usage && p.pending.includes('online_usage')) finishOnline();
+          if (p.data.local_usage && p.pending.includes('isambard_status')) finishPublic();
         });
         promise.then(last=>process.stdout.write(JSON.stringify({requests,updates,last})));
         ''')
-        self.assertTrue(any(u['data'].get('local_usage') and 'online_usage' in u['pending'] for u in result['updates']))
+        self.assertTrue(any(u['data'].get('local_usage') and 'isambard_status' in u['pending'] for u in result['updates']))
         self.assertFalse(result['last']['pending'])
         self.assertTrue(result['last']['ok'])
         for request in result['requests']:
             self.assertEqual(request['method'], 'POST' if request['report']=='isambard-status' else 'GET')
-        self.assertEqual(len(result['requests']), 5)
+        self.assertEqual(len(result['requests']), 3)
 
     def test_disabled_sources_make_no_requests_and_failures_stay_local(self):
         result = self.run_js('''
         const requests=[];
         global.fetch=async url=>{
           const report=new URL(url,'http://local').searchParams.get('report'); requests.push(report);
-          if(report==='online-usage')throw new Error('offline');
+          if(report==='claude-usage')throw new Error('unreadable');
           return {ok:true,status:200,json:async()=>({ok:true,data:{report}})};
         };
-        DashboardRefresh.run({report:'all',days:'30',sources:['codex'],force:false},()=>{})
+        DashboardRefresh.run({report:'all',days:'30',sources:['codex','claude'],force:false},()=>{})
           .then(last=>process.stdout.write(JSON.stringify({requests,last})));
         ''')
-        self.assertEqual(set(result['requests']), {'local-usage','online-usage','resets'})
+        self.assertEqual(set(result['requests']), {'local-usage','claude-usage'})
         self.assertEqual(result['last']['data']['local_usage']['report'], 'local-usage')
-        self.assertEqual(result['last']['errors'], [{'section':'online_usage','message':'offline'}])
-        self.assertTrue(result['last']['data']['claude_usage']['disabled'])
+        self.assertEqual(result['last']['errors'], [{'section':'claude_usage','message':'unreadable'}])
+        self.assertTrue(result['last']['data']['isambard_status']['disabled'])
 
     def test_inflight_requests_are_bounded(self):
         result = self.run_js('''
@@ -92,7 +92,7 @@ class ProgressiveRefreshTest(unittest.TestCase):
           return {ok:true,status:200,json:async()=>({ok:true,data:{}})};
         };
         DashboardRefresh.run({report:'all',range:'7d',rangeAnchor:'2026-10-01',days:'30',
-          sources:['codex','claude'],accountNetworkEnabled:false},()=>{})
+          sources:['codex','claude'],accountNetworkEnabled:true},()=>{})
           .then(last=>process.stdout.write(JSON.stringify({requests,last})));
         ''')
         self.assertEqual({r['report'] for r in result['requests']}, {'local-usage','claude-usage'})

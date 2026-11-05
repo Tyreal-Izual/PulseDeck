@@ -1,6 +1,6 @@
-# PulseDeck 0.2 development
+# PulseDeck development
 
-> Current policy (0.2): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. Earlier cloud-adapter notes below are historical and inactive.
+> Current policy: Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. Earlier cloud-adapter notes below are historical and inactive.
 
 ## Boundaries
 
@@ -13,7 +13,7 @@
 - `templates/` and `static/`: current browser presentation.
 - `scripts/windows.ps1`: Python discovery and UTF-8 startup.
 
-A desktop shell can replace browser opening while preserving Runtime and the collectors.
+The Windows desktop shell uses the same Runtime and collectors as the browser entry.
 Do not couple local file parsing or account authentication to a particular UI toolkit.
 
 ## API
@@ -31,7 +31,14 @@ Run `python -X utf8 -B -m unittest discover -v`.
 Tests use synthetic data, local temporary files and loopback servers.
 Real-data smoke checks must report unavailable sources without replacing them with mock data.
 For UI checks verify English/Chinese, desktop/mobile widths, no horizontal overflow,
-and missing or stale Claude quotas.
+and missing or stale Claude quotas. Codex and Claude quota panels each occupy a full row.
+
+Tests follow maintained behavior. The inactive Claude auth-client implementation
+and its login-indicator/string-matching tests have been removed. Progressive UI
+tests exercise local usage and public Isambard requests; they no longer simulate
+account endpoints. Keep the local-only transport guards, quota parsing/countdown,
+incremental accounting, and runtime lifecycle regressions. Optional CLI adapters
+and their tests remain separate from the current dashboard.
 
 ## Planned later
 

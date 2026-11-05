@@ -2,12 +2,11 @@
 const DashboardRefresh = (() => {
   const definitions = {
     local_usage: ['codex', 'local-usage'], claude_usage: ['claude', 'claude-usage'],
-    reset_credits: ['codex', 'resets'], online_usage: ['codex', 'online-usage'],
-    isambard_status: ['isambard', 'isambard-status'], api_usage: ['codex', 'api-usage']
+    isambard_status: ['isambard', 'isambard-status']
   };
   const reports = {
-    all: ['local_usage', 'claude_usage', 'online_usage', 'reset_credits', 'isambard_status'],
-    'codex-usage': ['local_usage', 'online_usage', 'reset_credits', 'api_usage'],
+    all: ['local_usage', 'claude_usage', 'isambard_status'],
+    'codex-usage': ['local_usage'],
     'claude-usage': ['claude_usage'], 'isambard-status': ['isambard_status']
   };
   async function request(report, days, force, signal, range, anchor) {
@@ -56,9 +55,7 @@ const DashboardRefresh = (() => {
     const jobs = [];
     for (const name of names) {
       const [source] = definitions[name];
-      if (settings.accountNetworkEnabled === false && ['online_usage', 'reset_credits', 'api_usage'].includes(name)) {
-        data[name] = {ok: true, disabled: true, local_only: true, source};
-      } else if (!settings.sources.includes(source) || (name === 'api_usage' && !settings.adminEnabled)) {
+      if (!settings.sources.includes(source)) {
         data[name] = {ok: true, disabled: true, source};
       } else {
         jobs.push(name);

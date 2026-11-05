@@ -8,7 +8,7 @@ from usage_common import CollectionError
 
 class LocalOnlyTest(unittest.TestCase):
     def test_account_collection_never_reads_credentials_or_launches_clients(self):
-        with patch.object(codex_usage, "load_auth", side_effect=AssertionError("credentials")), patch.object(codex_rpc.subprocess, "Popen", side_effect=AssertionError("process")), patch.object(claude_usage.subprocess, "run", side_effect=AssertionError("client")):
+        with patch.object(codex_usage, "load_auth", side_effect=AssertionError("credentials")), patch.object(codex_rpc.subprocess, "Popen", side_effect=AssertionError("process")), patch("subprocess.run", side_effect=AssertionError("client")):
             self.assertTrue(codex_usage.collect_online_usage()["local_only"])
             self.assertTrue(codex_usage.collect_resets()["local_only"])
             self.assertTrue(codex_usage.collect_api_usage(argparse.Namespace())["local_only"])
