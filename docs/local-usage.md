@@ -18,6 +18,19 @@ The API returns `settings.scope` and each collector returns `usage.scope`
 (Codex) or `local_usage.scope` (Claude). Source and report caches include the
 range and anchor; changing selection cancels and ignores old results.
 
+## Quota snapshots (0.4.1)
+
+The homepage shows quota bars separately from history. Codex reads the latest
+main-account `rate_limits` entry already present in `event_msg/token_count`
+logs, using the same incremental index. Window duration identifies five-hour
+versus seven-day limits, including weekly-only primary windows. Claude reads
+its existing capture file. No account requests or auth clients are started.
+Quotas ignore the history time filter. Countdown and snapshot-age labels tick
+locally every second; new percentages arrive on the normal 15-second refresh
+when the client has written a new snapshot. Missing windows display no value;
+stale snapshots are labeled, and reaching a reset time hides the old percentage
+until a new snapshot is available. A reset is never assumed to mean 100% remaining.
+
 ## Accounting
 
 - Codex prefers `token_usage_record.usage` per response. Legacy snapshots use

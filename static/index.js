@@ -28,7 +28,7 @@ __REFRESH_SCRIPT__
         statusWaiting: "Waiting for the first refresh.",
         report: "Report",
         reportAll: "Workspace overview",
-        backToLimits: "Back to limits",
+        backToLimits: "Back to quota",
         reportCodex: "Codex Usage",
         reportClaude: "Claude Code Usage",
         reportIsambard: "Isambard Service Status",
@@ -193,7 +193,7 @@ __REFRESH_SCRIPT__
         statusWaiting: "等待第一次刷新。",
         report: "报告",
         reportAll: "工作台总览",
-        backToLimits: "返回在线限额",
+        backToLimits: "返回额度",
         reportCodex: "Codex 用量",
         reportClaude: "Claude Code 用量",
         reportIsambard: "Isambard 服务状态",
@@ -818,7 +818,6 @@ __USAGE_SCRIPT__
         return [];
       }
       const rate = claude.rate_limits || {};
-      if (showDetailsLink) return renderUsage(claude.local_usage, "claude", true);
       const fiveHour = rate.five_hour || null;
       const sevenDay = rate.seven_day || null;
       const authStatus = rate.auth_status || {};
@@ -829,10 +828,10 @@ __USAGE_SCRIPT__
         ? t("claudeUsageCommand")
         : (rate.capture_installed ? t("claudeStatusLine") : t("claudeNotInstalled"));
       const headerExtras = [
-        { label: t("claudeSnapshotAge"), value: fmtDurationSeconds(rate.age_seconds) },
+        { label: t("claudeSnapshotAge"), valueHtml: quotaAgeMarkup(rate) },
         {
           label: t("claudeSnapshotState"),
-          value: rate.available ? (rate.stale ? t("claudeStale") : t("claudeFresh")) : t("unknown"),
+          valueHtml: quotaStateMarkup(rate),
           position: "end",
           tone: rate.available && !rate.stale ? "good" : "warn"
         },
@@ -869,12 +868,10 @@ __USAGE_SCRIPT__
           <span>${esc(t("claudeLoginWarningHint"))}</span>
           <code class="setup-command mono">claude auth login</code>
         </div>` : "";
-      const fiveHourReset = `${t("resetsIn")} ${fmtDurationSeconds(fiveHour?.reset_after_seconds)}`;
-      const sevenDayReset = `${t("resetsIn")} ${fmtDurationSeconds(sevenDay?.reset_after_seconds)}`;
-      const bars = `<div class="bars">${leftBar(t("claudeFiveHour"), fiveHour?.used_percentage, t("claudeFiveHourHint"), fiveHourReset, "claude.primary.remaining")}${leftBar(t("claudeWeekly"), sevenDay?.used_percentage, t("claudeWeeklyHint"), sevenDayReset, "claude.weekly.remaining")}</div>`;
+      const bars = `<div class="bars quota-bars">${quotaBar("claude", "five_hour", fiveHour, t("claudeFiveHour"))}${quotaBar("claude", "seven_day", sevenDay, t("claudeWeekly"))}</div>`;
 
-      const quota = panel(t("claudeRateLimits"), t("currentSnapshot"), bars + loginWarning + setup, true, "claude-rate", headerExtras);
-      return [...renderUsage(claude.local_usage, "claude"), collapsePanel(quota, "claude-quota", t("claudeRateLimits"))];
+      const quota = panel(t("claudeRateLimits"), t("quotaLocal"), bars + loginWarning + setup, !showDetailsLink, "claude-rate", headerExtras);
+      return [quota];
     }
 
     function renderApiUsage(api) {
@@ -1038,7 +1035,8 @@ __USAGE_SCRIPT__
         ? panel(CodexRadar.title(state.lang), CodexRadar.subtitle(state.lang), '<div id="codex-radar"></div>', true, "codex-radar-panel",
             [{label:t("updated"),valueHtml:'<span data-radar-age>—</span>'}]) : null;
       const panels = [
-        ...renderLocal(sections.local, overview), ...renderClaude(sections.claude, overview),
+        ...renderCodexQuota(sections.local, overview), ...renderClaude(sections.claude, overview),
+        ...renderLocal(sections.local, overview), ...renderUsage(sections.claude?.local_usage, "claude", overview),
         ...loadingPanels, ...disabledPanels, ...renderIsambard(sections.isambard),
         collapsePanel(radar, "radar-details", "Radar · " + t("moduleScores"))
       ];
@@ -1054,7 +1052,8 @@ __USAGE_SCRIPT__
       $("quota-note").textContent = t("quotaNote");
       if (radarPlaceholder) radarFocus?.focus({preventScroll: true});
       CodexRadar.mount(document.getElementById("codex-radar"), state.lang, fmtAgeSince);
-      const hasRateLimits = Boolean(document.querySelector('[data-panel-id="codex-rate"]'));
+      updateQuotaClocks();
+      const hasRateLimits = Boolean(document.querySelector('[data-panel-id="codex-rate"], [data-panel-id="claude-rate"]'));
       $("return-to-limits").hidden = !hasRateLimits;
       document.body.classList.toggle("has-return-to-limits", hasRateLimits);
       highlightChangedValues(previousValues, highlightChanges);
@@ -1191,7 +1190,7 @@ __USAGE_SCRIPT__
     $("refresh-now").addEventListener("click", () => refresh(true));
     $("return-to-limits").addEventListener("click", () => {
       state.initialPanelPositionPending = false;
-      const target = document.querySelector('[data-panel-id="codex-rate"]');
+      const target = document.querySelector('[data-panel-id="codex-rate"], [data-panel-id="claude-rate"]');
       target?.scrollIntoView({
         block: "start",
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"
@@ -1251,3 +1250,4 @@ __USAGE_SCRIPT__
     applyLanguage();
     setStatus(t("statusStarting"), t("statusWaiting"));
     refresh();
+    setInterval(updateQuotaClocks, 1000);

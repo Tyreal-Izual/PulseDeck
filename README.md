@@ -60,7 +60,9 @@ Only usage metadata is displayed. Local token history is not a billing statement
 
 Choose **Today / Last 7 days / Last 30 days / All local history**. Totals,
 models, projects, sessions, and charts share the same local calendar range.
-The overview has two usage cards; quota capture and Radar details are collapsed.
+The overview keeps five-hour/seven-day quota bars and reset countdowns above the
+two usage cards. Quotas come from local Codex logs and Claude capture snapshots;
+missing windows stay unavailable. Radar details are collapsed.
 Unchanged logs require no content reads; appends read only the suffix and small
 hash anchors. The index stays in memory. See [accounting and limitations](docs/local-usage.md).
 

@@ -10,6 +10,7 @@ import math
 import os
 from pathlib import Path
 import threading
+from .local_quota import codex_snapshot, quota_report
 
 CODEX_FIELDS = ("input_tokens", "cached_input_tokens", "cache_write_input_tokens",
                 "output_tokens", "reasoning_output_tokens", "total_tokens")
@@ -111,6 +112,7 @@ class CodexParser:
         self.lines = 0
         self.errors = 0
         self.latest_cumulative = None
+        self.quota_snapshot = None
 
     def consume(self, obj):
         if not isinstance(obj, dict):
@@ -122,6 +124,10 @@ class CodexParser:
         subtype = payload.get("type")
         if subtype is not None and not isinstance(subtype, str):
             return
+        if kind == "event_msg" and subtype == "token_count":
+            quota = codex_snapshot(payload.get("rate_limits"), timestamp(obj.get("timestamp")))
+            if quota and (self.quota_snapshot is None or quota["captured_at_unix_ms"] >= self.quota_snapshot["captured_at_unix_ms"]):
+                self.quota_snapshot = quota
         if kind == "compacted":
             self.endpoints.clear()
             return
@@ -424,6 +430,9 @@ def aggregate(home: Path, source: str, top: int = 10, range_name: str = "all", a
                 records[row["key"]] = row
         selected = [r for r in records.values() if scope.includes(r["timestamp"])]
         result = summarize(selected, source, top, scope)
+        if source == "codex":
+            snapshots = [state.parser.quota_snapshot for state in states if state.parser.quota_snapshot is not None]
+            result["rate_limits"] = quota_report(max(snapshots, key=lambda s: s["captured_at_unix_ms"], default=None))
         result.update(available=any(folder.exists() for folder in folders),
                       source=source, files=len(files), refresh=metrics,
                       quality={"parse_errors": parse_errors + metrics["read_errors"], "counter_resets": resets,

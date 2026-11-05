@@ -297,6 +297,7 @@ def collect_rate_limits(claude_home: Path, snapshot_path: Path) -> dict[str, Any
         {
             "available": bool(five_hour or seven_day),
             "captured_at": snapshot.get("captured_at"),
+            "captured_at_unix_ms": int(captured_epoch * 1000) if captured_epoch is not None else None,
             "captured_at_local": local_timestamp_text(snapshot.get("captured_at")),
             "age_seconds": age,
             "stale": age is None or age > base["stale_after_seconds"],

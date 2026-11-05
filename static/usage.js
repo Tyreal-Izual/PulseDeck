@@ -10,7 +10,9 @@ Object.assign(TEXT.en, {
   pendingLines: "Incomplete lines awaiting the next refresh", counterResets: "Counter resets detected", localFiles: "Local log files",
   readBytes: "Log bytes read on this scan", codexAccounting: "Input includes cached input; output includes reasoning. These details are not added twice.",
   claudeAccounting: "Total = input + output + cache creation + cache read. Repeated messages keep the most complete usage.",
-  quotaNote: "Local token history does not measure subscription quota. Captured Claude quota is in details.",
+  quotaNote: "Quotas use the latest local snapshots; token history uses the selected time range.",
+  codexQuota: "Codex · Remaining quota", quotaLocal: "Local quota snapshot", quotaNotReported: "Not provided in the local snapshot",
+  quotaResetWaiting: "Reset time reached; awaiting a new snapshot", quotaNoSnapshot: "No quota snapshot", quotaFresh: "Recent snapshot", quotaStale: "Snapshot is stale",
   rangePublicNote: "Time range applies to local token history. Public service status and Radar show their latest snapshots.",
   trendBucket: "days per bar", currentSnapshot: "Latest snapshot", cacheWriteTokens: "Cache write input (detail)"
 });
@@ -25,7 +27,9 @@ Object.assign(TEXT.zh, {
   pendingLines: "待下次刷新读取的未完成行", counterResets: "检测到的计数器重置", localFiles: "本地日志文件",
   readBytes: "本次扫描读取的日志字节", codexAccounting: "输入已包含缓存输入，输出已包含推理用量；这些细项不重复相加。",
   claudeAccounting: "总量 = 输入 + 输出 + 缓存写入 + 缓存读取；重复消息保留最完整的用量。",
-  quotaNote: "本地 Token 历史不代表订阅额度；已采集的 Claude 额度可在详情查看。",
+  quotaNote: "额度显示最新本地快照；Token 历史使用所选时间范围。",
+  codexQuota: "Codex · 剩余额度", quotaLocal: "本地额度快照", quotaNotReported: "本地快照未提供此窗口",
+  quotaResetWaiting: "已到重置时间，等待新快照", quotaNoSnapshot: "暂无额度快照", quotaFresh: "近期快照", quotaStale: "快照已过期",
   rangePublicNote: "时间筛选适用于本地 Token 历史；服务状态和 Radar 显示最新快照。",
   trendBucket: "天 / 柱", currentSnapshot: "最新快照", cacheWriteTokens: "缓存写入输入（细项）"
 });
@@ -115,4 +119,71 @@ function renderUsage(usage, source, overview = false) {
 function collapsePanel(item, id, label) {
   if (!item) return null;
   return {title:id, wide:true, html:`<details class="collapsed-panel" data-disclosure="${id}"><summary>${esc(label)}</summary>${item.html}</details>`};
+}
+
+function quotaCountdown(reset, now = Date.now()) {
+  if (!Number.isFinite(reset)) return "";
+  const seconds = Math.max(0, Math.ceil(reset - now / 1000));
+  if (!seconds) return t("quotaResetWaiting");
+  const days = Math.floor(seconds / 86400);
+  const clock = [Math.floor(seconds / 3600) % 24, Math.floor(seconds / 60) % 60, seconds % 60]
+    .map(value => String(value).padStart(2, "0")).join(":");
+  return `${t("resetsIn")} ${days ? days + " " + t("day") + " " : ""}${clock}`;
+}
+
+function quotaBar(source, key, window, label) {
+  const reset = window?.resets_at;
+  const expired = Number.isFinite(reset) && reset * 1000 <= Date.now();
+  const body = leftBar(label, expired ? undefined : window?.used_percentage,
+    t(expired ? "quotaResetWaiting" : window ? "quotaLocal" : "quotaNotReported"),
+    quotaCountdown(reset), `${source}.${key}.remaining`);
+  return `<div class="quota-window" ${Number.isFinite(reset) ? `data-quota-reset="${reset}"` : ""} data-expired="${expired}">${body}</div>`;
+}
+
+function quotaAgeMarkup(rate) {
+  const captured = rate.captured_at_unix_ms;
+  return Number.isFinite(captured) ? `<span data-quota-age="${captured}">${esc(fmtAgeSince(captured))}</span>` : "—";
+}
+
+function quotaStateMarkup(rate) {
+  if (!rate.available) return esc(t("quotaNoSnapshot"));
+  const captured = rate.captured_at_unix_ms;
+  return `<span data-quota-state="${Number.isFinite(captured) ? captured : 0}" data-stale-after="${rate.stale_after_seconds || 900}">${esc(t(rate.stale ? "quotaStale" : "quotaFresh"))}</span>`;
+}
+
+function updateQuotaClocks() {
+  const now = Date.now();
+  document.querySelectorAll("[data-quota-age]").forEach(node => {
+    node.textContent = fmtAgeSince(Number(node.dataset.quotaAge));
+  });
+  document.querySelectorAll("[data-quota-state]").forEach(node => {
+    const stale = !Number(node.dataset.quotaState) || now - Number(node.dataset.quotaState) > Number(node.dataset.staleAfter) * 1000;
+    node.textContent = t(stale ? "quotaStale" : "quotaFresh");
+    const fact = node.closest(".panel-heading-extra");
+    fact?.classList.toggle("panel-heading-extra--warn", stale);
+    fact?.classList.toggle("panel-heading-extra--good", !stale);
+  });
+  document.querySelectorAll("[data-quota-reset]").forEach(node => {
+    const reset = Number(node.dataset.quotaReset);
+    const footer = node.querySelector(".bar-reset");
+    if (footer) footer.textContent = quotaCountdown(reset, now);
+    if (reset * 1000 <= now && node.dataset.expired !== "true") {
+      node.dataset.expired = "true";
+      node.querySelector(".barhead > span:last-child").textContent = "—";
+      node.querySelector(".fill").style.width = "0%";
+      node.querySelector(".subtle").textContent = t("quotaResetWaiting");
+    }
+  });
+}
+
+function renderCodexQuota(local, overview = false) {
+  const rate = local?.rate_limits;
+  if (!rate) return [];
+  const extras = [
+    {label:t("updated"), valueHtml:quotaAgeMarkup(rate)},
+    {label:t("status"), valueHtml:quotaStateMarkup(rate)},
+    ...(rate.plan_type ? [{label:t("plan"), value:rate.plan_type}] : [])
+  ];
+  const bars = `<div class="bars quota-bars">${quotaBar("codex", "five_hour", rate.five_hour, t("claudeFiveHour"))}${quotaBar("codex", "seven_day", rate.seven_day, t("claudeWeekly"))}</div>`;
+  return [panel(t("codexQuota"), t("quotaLocal"), bars, !overview, "codex-rate", extras)];
 }

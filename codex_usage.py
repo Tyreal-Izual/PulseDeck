@@ -879,12 +879,14 @@ def collect_local_usage(codex_home: Path, top_n: int, range_name: str = "all", a
     if not codex_home.exists():
         die(f"Codex home not found: {codex_home}")
     sessions = scan_sessions_metadata(codex_home, top_n, range_name, anchor)
+    usage = sessions.pop("event_usage")
+    rate_limits = usage.pop("rate_limits")
     return {
         "retrieved_at_local": local_now_text(), "codex_home": str(codex_home),
         "network_calls_made": 0,
         "privacy_note": "Local usage events only; no conversation contents retained.",
         "sqlite_threads": {"selected": None, "all": []},
-        "sessions": sessions, "usage": sessions.pop("event_usage"),
+        "sessions": sessions, "usage": usage, "rate_limits": rate_limits,
     }
 
 
