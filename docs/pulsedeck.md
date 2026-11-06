@@ -1,12 +1,12 @@
 # PulseDeck development
 
-> Current policy: Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. Earlier cloud-adapter notes below are historical and inactive.
+> Current policy: token history and quota windows are local. Only Reset Credits may use the read-only Codex account method, with a five-minute cache. All other account-network paths remain disabled; Isambard/Radar public fetches are independent.
 
 ## Boundaries
 
 - `pulsedeck/modules.py`: module catalog, data kinds, report identifiers and refresh policies.
-- `pulsedeck/privacy.py`: disables all account-network collection.
-- `pulsedeck/codex_rpc.py`: inactive app-server adapter; blocked by the local-only policy.
+- `pulsedeck/privacy.py`: blocks general account-network collection and controls the narrow reset-credit exception.
+- `pulsedeck/codex_rpc.py`: app-server reader, restricted to rate-limit reads when used for Reset Credits.
 - `pulsedeck/runtime.py`: loopback server lifecycle, authenticated control, OS single-instance lock.
 - `pulsedeck/__main__.py`: browser launcher, background process, diagnostics and stop commands.
 - Existing root collectors: metadata extraction, source caches, normalization, reports.
@@ -35,8 +35,8 @@ and missing or stale Claude quotas. Codex and Claude quota panels each occupy a 
 
 Tests follow maintained behavior. The inactive Claude auth-client implementation
 and its login-indicator/string-matching tests have been removed. Progressive UI
-tests exercise local usage and public Isambard requests; they no longer simulate
-account endpoints. Keep the local-only transport guards, quota parsing/countdown,
+tests exercise local usage, public Isambard requests, and the separately enabled
+Reset Credits report. RPC tests enforce the exact read-only method sequence. Keep the local-only transport guards, quota parsing/countdown,
 incremental accounting, and runtime lifecycle regressions. Optional CLI adapters
 and their tests remain separate from the current dashboard.
 

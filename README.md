@@ -1,6 +1,6 @@
 # PulseDeck
 
-> Current policy (0.4): Codex/Claude account collection is LOCAL ONLY. App-server, legacy backend and Admin API account requests are disabled. Claude snapshots are read from disk; no auth-status client is started. Isambard/Radar public fetches remain enabled. The disabled cloud adapters are retained only for possible future development.
+> Current policy (0.4.6): token history and quota windows remain local. Reset Credits alone use the signed-in Codex client for a read-only account lookup, cached for five minutes. Profile, account token history, Admin API and legacy HTTP account requests remain disabled. Isambard/Radar use public sources.
 
 **Your local dashboard for AI usage, infrastructure status, and model intelligence.**
 
@@ -49,7 +49,7 @@ The default port is 8765; if occupied, the application selects an available loca
 
 ## Data sources and limitations
 
-- **Codex:** reads local usage events and cumulative snapshots, attributing models from turn context. Account network access is disabled in `pulsedeck/privacy.py`, including the app-server, legacy backend and Admin API paths. No cloud fallback is used.
+- **Codex:** reads local usage events and cumulative snapshots, attributing models from turn context. Reset Credits use only `account/rateLimits/read` through the existing Codex client; the returned account quota windows are ignored. Other account-network paths remain disabled, with no legacy HTTP fallback.
 - **Claude:** local JSONL history is independent of subscription quota capture. The official statusLine supplies quotas only when a compatible Claude Code client invokes it with those fields. Claude Desktop may write history without invoking the bridge. Missing or stale quotas stay visibly unavailable/stale; browser refresh cannot create a new account snapshot. This release does not automate a hidden Claude conversation or port the macOS expect refresher.
 - **Isambard:** public service health and maintenance, not personal jobs or GPU allocations.
 - **Radar:** community assessment scores, not official model ratings. HTML/catalog changes can require adapter updates; failed updates keep the last valid snapshot and its original timestamp.
@@ -62,7 +62,7 @@ Choose **Today / Last 7 days / Last 30 days / All local history**. Totals,
 models, projects, sessions, and charts share the same local calendar range.
 The overview keeps five-hour/seven-day quota bars and reset countdowns above the
 two usage cards. Quotas come from local Codex logs and Claude capture snapshots;
-missing windows stay unavailable. Radar details are collapsed.
+missing windows stay unavailable. Reset Credits show their available count and expiry details inside the Codex card; they are never consumed by PulseDeck. Radar details are collapsed.
 Unchanged logs require no content reads; appends read only the suffix and small
 hash anchors. The index stays in memory. See [accounting and limitations](docs/local-usage.md).
 
@@ -74,6 +74,7 @@ The temporary browser access token stays in local runtime state and is never com
 
 Supported overrides: `PULSEDECK_DATA_DIR`, `PULSEDECK_CACHE_DIR`, `CODEX_HOME`,
 `CLAUDE_CONFIG_DIR`, `CLAUDE_BIN`, `CLAUDE_USAGE_SNAPSHOT`.
+Set `PULSEDECK_RESET_CREDITS_ONLINE=0` before launching to disable the Reset Credits account lookup.
 Legacy `CODEX_USAGE_CACHE_DIR` remains supported.
 
 The server binds to loopback and requires a session capability for dashboard data.

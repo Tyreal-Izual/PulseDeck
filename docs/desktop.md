@@ -14,7 +14,8 @@ arrives, adjusting if the remaining initial content changes the available page
 height. Scrolling manually cancels this; later refreshes do not move the view
 back. An explicit Radar link keeps its own target.
 
-Account collection remains local-only. Isambard and Radar still fetch public
+Tokens and quota windows remain local; Reset Credits alone use a cached read-only
+Codex account lookup. Isambard and Radar still fetch public
 information. Version 0.4 uses [event accounting and unified time ranges](local-usage.md).
 
 Runtime state, bounded error logs, and WebView preferences live under

@@ -1,8 +1,8 @@
 # Local usage accounting (0.4)
 
 PulseDeck reads Codex `sessions/` and `archived_sessions/`, and Claude
-`projects/` JSONL files. It never calls account APIs, launches an auth client,
-or uploads usage. Isambard and Radar remain separate public sources.
+`projects/` JSONL files. These statistics never call account APIs, launch an auth client,
+or upload usage. Reset Credits have the separate read-only exception below. Isambard and Radar remain separate public sources.
 
 ## One calendar range
 
@@ -24,12 +24,30 @@ The homepage shows quota bars separately from history. Codex reads the latest
 main-account `rate_limits` entry already present in `event_msg/token_count`
 logs, using the same incremental index. Window duration identifies five-hour
 versus seven-day limits, including weekly-only primary windows. Claude reads
-its existing capture file. No account requests or auth clients are started.
+its existing capture file. These local quota collectors do not start account requests.
 Quotas ignore the history time filter. Countdown and snapshot-age labels tick
 locally every second; new percentages arrive on the normal 15-second refresh
 when the client has written a new snapshot. Missing windows display no value;
 stale snapshots are labeled, and reaching a reset time hides the old percentage
 until a new snapshot is available. A reset is never assumed to mean 100% remaining.
+
+## Reset Credits (0.4.6)
+
+Reset Credits alone use the documented Codex app-server `account/rateLimits/read`
+method through the installed, signed-in client. The RPC sequence contains only
+`initialize`, `initialized`, and that read method. The reply's other quota and
+usage data are discarded. There is no account-history request, legacy HTTP
+fallback, or redemption action. Protocol reference: [official OpenAI documentation](https://learn.chatgpt.com/docs/app-server).
+
+The server coalesces requests and caches the result for 300 seconds, including
+failed reads, so UI refresh and range switches do not generate repeated account
+lookups. The available count is authoritative even if detail rows are capped or
+missing. Null counts remain unavailable, not zero. The panel shows read time;
+expiry countdowns tick locally. No Reset Credits snapshot is written to disk.
+
+This exception is enabled by default in this version. Set
+`PULSEDECK_RESET_CREDITS_ONLINE=0` before starting to disable it. The broader
+`ACCOUNT_NETWORK_ENABLED` policy remains false.
 
 ## Accounting
 

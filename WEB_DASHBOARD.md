@@ -29,7 +29,7 @@ python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache --check
 
 The page URL can override the default view with `?report=claude-usage` after
 sign-in. Disabled sources return `disabled: true` and never run collectors.
-Account-network reports are disabled, including Admin API even when a key is configured.
+Account token-history/profile and Admin API reports remain disabled. Reset Credits alone have a read-only Codex-client exception.
 Browser language and time range are saved locally.
 
 首次认证后可用 `?report=claude-usage` 指定视图。关闭的来源不会执行采集。
@@ -62,7 +62,8 @@ renders a late response for the old selection.
 | Source | Reuse / 更新策略 |
 | --- | --- |
 | Codex local | 5-second source cache; unchanged files read no content, appends read only the suffix |
-| Codex online/reset credits | Disabled: local-only policy |
+| Reset Credits | Read-only Codex client lookup, cached 5 minutes; no redemption |
+| Codex online/profile | Disabled |
 | Claude | 5-second source cache; same incremental metadata index |
 | Optional Admin API | Disabled: local-only policy |
 | Isambard | 30-second source cache over a 5-minute disk cache |
@@ -76,6 +77,7 @@ renders a late response for the old selection.
 
 | Variable | Purpose / 用途 |
 | --- | --- |
+| `PULSEDECK_RESET_CREDITS_ONLINE` | Defaults to `1`; set `0` to disable Reset Credits lookup |
 | `CODEX_HOME` | Codex state directory; default `~/.codex` |
 | `CLAUDE_CONFIG_DIR` | Claude state directory; default `~/.claude` |
 | `CLAUDE_BIN` | Explicit Claude launcher for auth checks and the refresher |
@@ -113,7 +115,7 @@ files are not deleted. Custom cache directories do not read legacy caches.
 | `GET /healthz` | Health check; no account data or authentication required |
 | `GET /api/usage` | Usage JSON |
 | `GET /api/codex-radar` | In-memory snapshot only; never triggers a fetch |
-| `GET /api/sources` | Current sources, `accountNetworkEnabled: false`, and `localDate` |
+| `GET /api/sources` | Current sources, `accountNetworkEnabled: false`, `resetCreditsNetworkEnabled`, and `localDate` |
 | `POST /api/sources?isambard=false&radar=true` | Change public-source switches; authenticated, requires `X-Codex-Usage-Action: set-sources` |
 
 Pages and data APIs require the browser session cookie, or

@@ -57,6 +57,7 @@ class ProgressiveRefreshTest(unittest.TestCase):
         self.assertEqual(result['last']['data']['local_usage']['report'], 'local-usage')
         self.assertEqual(result['last']['errors'], [{'section':'claude_usage','message':'unreadable'}])
         self.assertTrue(result['last']['data']['isambard_status']['disabled'])
+        self.assertTrue(result['last']['data']['reset_credits']['disabled'])
 
     def test_inflight_requests_are_bounded(self):
         result = self.run_js('''
@@ -84,7 +85,7 @@ class ProgressiveRefreshTest(unittest.TestCase):
         self.assertEqual(result['method'], 'GET')
         self.assertNotIn('isambard_force_refresh', result['url'])
 
-    def test_local_sources_share_range_and_anchor_without_account_requests(self):
+    def test_history_stays_local_when_reset_credit_exception_is_enabled(self):
         result = self.run_js('''
         const requests=[];
         global.fetch=async url=>{
@@ -92,10 +93,10 @@ class ProgressiveRefreshTest(unittest.TestCase):
           return {ok:true,status:200,json:async()=>({ok:true,data:{}})};
         };
         DashboardRefresh.run({report:'all',range:'7d',rangeAnchor:'2026-10-01',days:'30',
-          sources:['codex','claude'],accountNetworkEnabled:true},()=>{})
+          sources:['codex','claude'],resetCreditsNetworkEnabled:true},()=>{})
           .then(last=>process.stdout.write(JSON.stringify({requests,last})));
         ''')
-        self.assertEqual({r['report'] for r in result['requests']}, {'local-usage','claude-usage'})
+        self.assertEqual({r['report'] for r in result['requests']}, {'local-usage','claude-usage','resets'})
         self.assertTrue(all(r['range']=='7d' and r['range_anchor']=='2026-10-01' for r in result['requests']))
         self.assertEqual(result['last']['range'], '7d')
 

@@ -662,3 +662,8 @@ __RADAR_STYLE__
     @media (max-width:640px) { .toolbar { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar select { min-width:0; width:100%; } .usage-total {font-size:30px;} }
     .trend-plot {display:flex;gap:8px;} .trend-bars {flex:1;min-width:0;} .trend-scale {display:flex;flex-direction:column;justify-content:space-between;color:var(--muted);font-size:10px;min-width:52px;text-align:right;} .trend-axis {padding-right:60px;}
     .quota-window {min-width:0;} .quota-window .barbox {height:100%;} .quota-bars .bar-meta {flex-wrap:wrap;gap:4px 8px;}
+    .reset-credits {margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+    .reset-credit-heading {display:flex;align-items:center;flex-wrap:wrap;gap:8px 20px;font-size:12px;}
+    .reset-credit-heading > strong {color:var(--accent);font-size:13px;}
+    .reset-credit-heading b {font-size:18px;margin-left:6px;}
+    .reset-credit-meta {color:var(--muted);}

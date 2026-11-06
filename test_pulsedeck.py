@@ -42,8 +42,16 @@ class AccountMappingTest(unittest.TestCase):
             "resetType": "codexRateLimits", "grantedAt": 1781654400, "expiresAt": None}]}}})
         self.assertEqual(report["available_count"], 3)
         self.assertEqual(report["credits_returned"], 1)
+        self.assertTrue(report["details_available"])
         self.assertNotIn("private-credit-id", json.dumps(report))
         self.assertIsNone(codex_rpc.resets_report({"limits": {}}))
+        count_only=codex_rpc.resets_report({"limits":{"rateLimitResetCredits":{"availableCount":3,"credits":None}}})
+        self.assertEqual(count_only["available_count"],3)
+        self.assertFalse(count_only["details_available"])
+        self.assertIsNone(count_only["credits_returned"])
+        empty=codex_rpc.resets_report({"limits":{"rateLimitResetCredits":{"availableCount":0,"credits":[]}}})
+        self.assertEqual(empty["available_count"],0)
+        self.assertTrue(empty["details_available"])
 
 class RuntimeTest(unittest.TestCase):
     def test_single_instance_lock_releases_after_failure(self):

@@ -1,6 +1,6 @@
 # PulseDeck
 
-> 0.4 当前策略：Codex/Claude 仅读取本地文件和已有额度快照；停用 app-server、内部接口、Admin API 和客户端登录检查。Isambard/Radar 公共数据仍正常更新。云端适配代码仅保留供以后开发，当前不会执行。
+> 0.4.6 当前策略：Token 历史和额度窗口继续仅读取本地；仅 Reset Credits 通过已登录的 Codex 客户端做只读账户查询，每 5 分钟最多一次，不消耗重置券。其他账户统计、Admin API 和旧内部 HTTP 接口仍停用，Isambard/Radar 公共数据正常更新。
 
 集中查看 Codex、Claude Code 用量、Isambard 服务状态和 Radar 模型评测的本地面板。
 
@@ -25,11 +25,13 @@
 - 首页直接显示 5 小时／7 天剩余额度、重置倒计时和两张用量概览；详细记录与 Radar 按需展开。
 - 额度仅读取 Codex 日志和 Claude 本地快照，倒计时每秒更新；缺失或过期的数据会明确标注。
 
+Reset Credits 位于 Codex 额度卡片内，显示服务端可用次数和到期明细；主刷新按钮不会绕过五分钟缓存。若要关闭该项联网，启动前设置 `PULSEDECK_RESET_CREDITS_ONLINE=0`。
+
 统计边界见 [本地统计说明](docs/local-usage.md)。
 
 ## 数据范围
 
-Codex 仅展示本地使用历史、模型和会话统计，当前关闭所有账号网络查询。
+Codex 仅展示本地使用历史、模型和会话统计，仅 Reset Credits 允许只读账户查询。
 Claude 的本地使用历史可以直接读取；5 小时/7 天额度需要兼容客户端产生 statusLine 快照。
 Claude Desktop 可能只更新本地历史，所以不能把没有快照误认为还有 100% 额度。
 Isambard 显示公共状态和维护计划，个人作业留待后续接入。

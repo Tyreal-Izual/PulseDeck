@@ -326,7 +326,7 @@ def collect_report(
 
     # name -> source, TTL, cache parameters, collector
     collectors = {
-        "reset_credits": ("codex", 60, (), codex_usage.collect_resets),
+        "reset_credits": ("codex", codex_usage.RESET_CREDITS_REFRESH_SECONDS, (), codex_usage.collect_resets),
         "local_usage": ("codex", 5, (top, range_name, range_anchor or date.today().isoformat()), local),
         "online_usage": ("codex", 60, (), codex_usage.collect_online_usage),
         "claude_usage": ("claude", 5, (top, range_name, range_anchor or date.today().isoformat()),
@@ -601,8 +601,10 @@ class UsageWebHandler(BaseHTTPRequestHandler):
         self.send_usage(parsed.query, allow_force_refresh=True)
 
     def source_settings(self) -> dict[str, Any]:
+        from pulsedeck.privacy import RESET_CREDITS_NETWORK_ENABLED
         with self.server.sources_lock:
             return {"sources": sorted(self.server.enabled_sources), "accountNetworkEnabled": False,
+                    "resetCreditsNetworkEnabled": RESET_CREDITS_NETWORK_ENABLED,
                     "localDate": date.today().isoformat()}
 
     def radar_snapshot(self) -> dict[str, Any]:

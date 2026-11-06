@@ -2,11 +2,11 @@
 const DashboardRefresh = (() => {
   const definitions = {
     local_usage: ['codex', 'local-usage'], claude_usage: ['claude', 'claude-usage'],
-    isambard_status: ['isambard', 'isambard-status']
+    isambard_status: ['isambard', 'isambard-status'], reset_credits: ['codex', 'resets']
   };
   const reports = {
-    all: ['local_usage', 'claude_usage', 'isambard_status'],
-    'codex-usage': ['local_usage'],
+    all: ['local_usage', 'claude_usage', 'isambard_status', 'reset_credits'],
+    'codex-usage': ['local_usage', 'reset_credits'],
     'claude-usage': ['claude_usage'], 'isambard-status': ['isambard_status']
   };
   async function request(report, days, force, signal, range, anchor) {
@@ -55,7 +55,7 @@ const DashboardRefresh = (() => {
     const jobs = [];
     for (const name of names) {
       const [source] = definitions[name];
-      if (!settings.sources.includes(source)) {
+      if (!settings.sources.includes(source) || (name === 'reset_credits' && settings.resetCreditsNetworkEnabled !== true)) {
         data[name] = {ok: true, disabled: true, source};
       } else {
         jobs.push(name);

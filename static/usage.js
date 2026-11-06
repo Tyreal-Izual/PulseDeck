@@ -2,6 +2,12 @@
 Object.assign(TEXT.en, {
   timeRange: "Time range", rangeToday: "Today", range7d: "Last 7 days", range30d: "Last 30 days", rangeAll: "All local history",
   localScope: "Local time", localPolicy: "This computer only · Account network access is off",
+  localPolicyWithResets: "Tokens & quotas: local · Reset Credits: read-only account lookup",
+  resetCredits: "Reset Credits", resetAvailable: "Available resets", resetReadOnly: "Read-only account lookup · Every 5 min",
+  resetLoading: "Reading reset credits…", resetDisabled: "Account lookup is disabled", resetUnavailable: "Reset credits are unavailable",
+  resetNotProvided: "The service did not provide a reset count", resetDetails: "Expiry details", resetNoDetails: "The service provided no detail rows",
+  resetDetailHint: "The available count comes from the service; detail rows may be incomplete.", resetStatusAtRead: "Status at last read",
+  resetGranted: "Granted", resetExpires: "Expires", resetTimeLeft: "Time left", resetReady: "Available", resetExpired: "Expired", resetRedeemed: "Redeemed",
   viewDetails: "View details", usageEvents: "Usage records", modelBreakdown: "Models", projectBreakdown: "Projects",
   otherModels: "Other models", unknownModel: "Unknown model", dataNotes: "Data notes", dailyTrend: "Daily tokens",
   noUsage: "No usage recorded in this range.", dataUnavailable: "Local usage unavailable",
@@ -19,6 +25,12 @@ Object.assign(TEXT.en, {
 Object.assign(TEXT.zh, {
   timeRange: "时间范围", rangeToday: "今天", range7d: "近 7 天", range30d: "近 30 天", rangeAll: "全部本地历史",
   localScope: "本地时间", localPolicy: "仅此电脑 · 账户网络访问已关闭",
+  localPolicyWithResets: "Token 与额度快照：本地 · Reset Credits：只读账户查询",
+  resetCredits: "Reset Credits", resetAvailable: "可用次数", resetReadOnly: "只读账户查询 · 每 5 分钟检查",
+  resetLoading: "正在读取重置券…", resetDisabled: "账户查询未启用", resetUnavailable: "重置券信息暂不可用",
+  resetNotProvided: "服务未提供重置券次数", resetDetails: "到期明细", resetNoDetails: "服务未提供明细",
+  resetDetailHint: "可用次数以服务端汇总为准，明细可能不完整。", resetStatusAtRead: "读取时状态",
+  resetGranted: "获得时间", resetExpires: "到期时间", resetTimeLeft: "剩余时间", resetReady: "可用", resetExpired: "已到期", resetRedeemed: "已使用",
   viewDetails: "查看详情", usageEvents: "用量记录", modelBreakdown: "模型排行", projectBreakdown: "项目排行",
   otherModels: "其他模型", unknownModel: "模型未知", dataNotes: "数据说明", dailyTrend: "每日 Token",
   noUsage: "此时间范围内暂无用量记录。", dataUnavailable: "本地用量暂不可用",
@@ -198,9 +210,35 @@ function updateQuotaClocks() {
       node.querySelector(".subtle").textContent = t("quotaResetWaiting");
     }
   });
+  document.querySelectorAll("[data-reset-credit-expiry]").forEach(node => {
+    const seconds = (Number(node.dataset.resetCreditExpiry) - now) / 1000;
+    node.textContent = seconds <= 0 ? t("resetExpired") : fmtDurationSeconds(seconds);
+  });
 }
 
-function renderCodexQuota(local) {
+function resetCreditsMarkup(resets) {
+  const unavailable = !resets ? "resetLoading" : resets.disabled ? "resetDisabled"
+    : resets.ok === false ? "resetUnavailable" : resets.available_count == null ? "resetNotProvided" : "";
+  const count = unavailable ? "—" : trackedNumber("codex.resetCredits", resets.available_count);
+  const updated = Number.isFinite(resets?.retrieved_at_unix_ms)
+    ? `<span>${esc(t("updated"))} ${quotaAgeMarkup({captured_at_unix_ms:resets.retrieved_at_unix_ms})}</span>` : "";
+  const rows = (resets?.credits || []).map(credit => {
+    const expiry = Date.parse(credit.expires_at || "");
+    const status = credit.status === "available" ? t("resetReady") : credit.status === "expired" ? t("resetExpired")
+      : credit.status === "redeemed" ? t("resetRedeemed") : credit.status || "—";
+    const remaining = Number.isFinite(expiry)
+      ? `<span data-reset-credit-expiry="${expiry}">${esc(expiry <= Date.now() ? t("resetExpired") : fmtDurationSeconds((expiry-Date.now())/1000))}</span>` : "—";
+    return [esc(status), esc(credit.granted_at_local || "—"), esc(credit.expires_at_local || "—"), remaining];
+  });
+  const details = rows.length ? `<details class="data-notes" data-disclosure="reset-credit-details"><summary>${esc(t("resetDetails"))} (${rows.length})</summary>
+    ${table([t("resetStatusAtRead"),t("resetGranted"),t("resetExpires"),t("resetTimeLeft")],rows)}<p>${esc(t("resetDetailHint"))}</p></details>` : "";
+  const note = unavailable && unavailable !== "resetDisabled" ? t(unavailable) : !unavailable && resets.available_count > 0 && !rows.length ? t("resetNoDetails") : "";
+  return `<div class="reset-credits"><div class="reset-credit-heading"><strong>${esc(t("resetCredits"))}</strong>
+    <span>${esc(t("resetAvailable"))} <b>${count}</b></span><span class="reset-credit-meta">${esc(t(unavailable === "resetDisabled" ? "resetDisabled" : "resetReadOnly"))}</span>${updated}</div>
+    ${note ? `<p class="subtle">${esc(note)}</p>` : ""}${details}</div>`;
+}
+
+function renderCodexQuota(local, resets) {
   const rate = local?.rate_limits;
   if (!rate) return [];
   const extras = [
@@ -209,5 +247,5 @@ function renderCodexQuota(local) {
     ...(rate.plan_type ? [{label:t("plan"), value:rate.plan_type}] : [])
   ];
   const bars = `<div class="bars quota-bars">${quotaBar("codex", "five_hour", rate.five_hour, t("claudeFiveHour"))}${quotaBar("codex", "seven_day", rate.seven_day, t("claudeWeekly"))}</div>`;
-  return [panel(t("codexQuota"), t("quotaLocal"), bars, true, "codex-rate", extras)];
+  return [panel(t("codexQuota"), t("quotaLocal"), bars + resetCreditsMarkup(resets), true, "codex-rate", extras)];
 }

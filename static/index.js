@@ -104,7 +104,7 @@ __REFRESH_SCRIPT__
       zh: {
         moduleScores: "模型评测",
         appTitle: "PulseDeck",
-        subtitle: "AI 用量仅从本机读取，不查询账号接口；Isambard 与 Radar 继续使用公开数据。",
+        subtitle: "本地 AI 用量、服务状态和模型评测。",
         sourceDisabled: "未启用",
         loadingSources: "正在加载数据源",
         statusStarting: "正在启动",
@@ -479,6 +479,7 @@ __USAGE_SCRIPT__
 
     function splitSections(data, report) {
       return {
+        resets: ["all", "codex-usage"].includes(report) ? data?.reset_credits : null,
         local: ["all", "codex-usage"].includes(report) ? data?.local_usage : null,
         claude: report === "all" ? data?.claude_usage : (report === "claude-usage" ? data : null),
         isambard: report === "all" ? data?.isambard_status : (report === "isambard-status" ? data : null)
@@ -625,6 +626,7 @@ __USAGE_SCRIPT__
       }
       const disabled = [];
       for (const [name, value] of Object.entries(sections)) {
+        if (name === "resets") continue;
         if (value?.disabled) {
           if (name !== "isambard" || report === "isambard-status") disabled.push(value.source);
           sections[name] = null;
@@ -657,7 +659,7 @@ __USAGE_SCRIPT__
       showNotice(warnings);
 
       const overview = report === "all";
-      const loadingPanels = (payload.pending || []).filter(name => !data[name] && (name !== "isambard_status" || dashboardConfig.sources.includes("isambard"))).map(name => panel(
+      const loadingPanels = (payload.pending || []).filter(name => name !== "reset_credits" && !data[name] && (name !== "isambard_status" || dashboardConfig.sources.includes("isambard"))).map(name => panel(
         {local_usage:"Codex", claude_usage:"Claude Code", isambard_status:"Isambard"}[name] || name,
         t("loadingSources"), `<div class="empty" role="status">${esc(t("refreshing"))}…</div>`, name === "isambard_status", `loading-${name}`));
       const disabledPanels = [...new Set(disabled)].map(source => panel(
@@ -667,7 +669,7 @@ __USAGE_SCRIPT__
         ? panel(CodexRadar.title(state.lang), CodexRadar.subtitle(state.lang), '<div id="codex-radar"></div>', true, "codex-radar-panel",
             [{label:t("updated"),valueHtml:'<span data-radar-age>—</span>'}]) : null;
       const panels = [
-        ...renderCodexQuota(sections.local), ...renderClaudeQuota(sections.claude),
+        ...renderCodexQuota(sections.local, sections.resets), ...renderClaudeQuota(sections.claude),
         ...renderIsambard(sections.isambard), ...loadingPanels.filter(p => p.title === "loading-isambard_status"),
         ...renderLocal(sections.local, overview), ...renderUsage(sections.claude?.local_usage, "claude", overview),
         ...loadingPanels.filter(p => p.title !== "loading-isambard_status"), ...disabledPanels,
@@ -681,7 +683,7 @@ __USAGE_SCRIPT__
       if (radarRoot && radarPlaceholder) radarPlaceholder.replaceWith(radarRoot);
       document.querySelectorAll("[data-disclosure]").forEach(node => { node.open = expanded.has(node.dataset.disclosure); });
       $("scope-note").textContent = t("rangePublicNote");
-      $("local-policy").textContent = t("localPolicy");
+      $("local-policy").textContent = t(dashboardConfig.resetCreditsNetworkEnabled ? "localPolicyWithResets" : "localPolicy");
       $("quota-note").textContent = t("quotaNote");
       if (radarPlaceholder) radarFocus?.focus({preventScroll: true});
       CodexRadar.mount(document.getElementById("codex-radar"), state.lang, fmtAgeSince);
@@ -718,6 +720,7 @@ __USAGE_SCRIPT__
 
     function applySourceSettings(settings) {
       dashboardConfig.sources = settings.sources;
+      if (settings.resetCreditsNetworkEnabled !== undefined) dashboardConfig.resetCreditsNetworkEnabled = settings.resetCreditsNetworkEnabled;
       $("isambard-enabled").checked = settings.sources.includes("isambard");
       $("radar-enabled").checked = settings.sources.includes("radar");
     }
@@ -778,6 +781,7 @@ __USAGE_SCRIPT__
         applySourceSettings(sourceSettings);
         sameReport = sameReport && state.lastPayload?.rangeAnchor === sourceSettings.localDate;
         await DashboardRefresh.run({report, days, range, rangeAnchor:sourceSettings.localDate, sources: dashboardConfig.sources,
+          resetCreditsNetworkEnabled: dashboardConfig.resetCreditsNetworkEnabled,
           force: forceIsambardRefresh === true, signal: controller.signal}, payload => {
           // A result from the previous selection must never overwrite the new view.
           if ($("report").value !== report || $("time-range").value !== range || revision !== state.sourceRevision || controller.signal.aborted) return;

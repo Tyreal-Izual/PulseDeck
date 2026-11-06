@@ -52,10 +52,23 @@ class CollectionTest(unittest.TestCase):
         cache = sources.SourceCache()
         with patch.object(web.codex_usage, 'collect_local_usage', return_value={}) as codex, patch.object(web.claude_usage, 'collect_usage', return_value={}) as claude:
             for scope, anchor in [('today','2026-10-01'),('7d','2026-10-01'),('7d','2026-10-02'),('7d','2026-10-02')]:
-                self.report(source_cache=cache, enabled_sources=frozenset({'codex','claude'}), range_name=scope, range_anchor=anchor)
+                for report in ('local-usage','claude-usage'):
+                    self.report(report, source_cache=cache, enabled_sources=frozenset({'codex','claude'}), range_name=scope, range_anchor=anchor)
             self.assertEqual(codex.call_count, 3)
             self.assertEqual(claude.call_count, 3)
             self.assertEqual(codex.call_args.kwargs['anchor'], claude.call_args.kwargs['anchor'])
+
+    def test_reset_account_lookup_is_cached_for_five_minutes_across_ranges(self):
+        now=[0]
+        cache=sources.SourceCache(lambda:now[0])
+        with patch.object(web.codex_usage,'collect_resets',return_value={'ok':True,'available_count':3}) as collect:
+            self.report('resets',source_cache=cache,range_name='today')
+            now[0]=299
+            self.report('resets',source_cache=cache,range_name='all')
+            self.assertEqual(collect.call_count,1)
+            now[0]=301
+            self.report('resets',source_cache=cache,range_name='7d')
+            self.assertEqual(collect.call_count,2)
 
     def test_live_isambard_survives_cache_write_failure(self):
         with tempfile.TemporaryDirectory() as directory:

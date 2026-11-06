@@ -574,40 +574,28 @@ def redact_admin(value: Any, key: str | None = None) -> Any:
     return value
 
 
+RESET_CREDITS_REFRESH_SECONDS = 300
+
+
 def collect_resets() -> dict[str, Any]:
-    from pulsedeck.privacy import ACCOUNT_NETWORK_ENABLED, unavailable
-    if not ACCOUNT_NETWORK_ENABLED:
+    """Read earned resets through Codex only; no legacy HTTP or account-usage fallback."""
+    from pulsedeck.privacy import RESET_CREDITS_NETWORK_ENABLED, unavailable
+    if not RESET_CREDITS_NETWORK_ENABLED:
         return unavailable()
-    from pulsedeck.codex_rpc import account_snapshot, resets_report
-    snapshot = account_snapshot()
-    if snapshot is not None:
-        report = resets_report(snapshot)
-        if report is not None:
-            return report
-    access_token, account_id = load_auth()
-    response = fetch_json("/wham/rate-limit-reset-credits", access_token, account_id)
-    retrieved_at = datetime.now().astimezone()
-    if not response.get("ok"):
-        return {
-            "retrieved_at_local": retrieved_at.strftime("%Y-%m-%d %H:%M:%S %Z %z"),
-            "retrieved_at_unix_ms": round(retrieved_at.timestamp() * 1000),
-            "ok": False,
-            "error": response,
-        }
-    data = response.get("data") if isinstance(response.get("data"), dict) else {}
-    credits_raw = data.get("credits", []) if isinstance(data, dict) else []
-    credits = credits_raw if isinstance(credits_raw, list) else []
-    normalised = [normalise_credit_for_json(c) for c in credits if isinstance(c, dict)]
-    return {
-        "retrieved_at_local": retrieved_at.strftime("%Y-%m-%d %H:%M:%S %Z %z"),
-        "retrieved_at_unix_ms": round(retrieved_at.timestamp() * 1000),
-        "ok": True,
-        "available_count": data.get("available_count"),
-        "credits_returned": len(normalised),
-        "total_earned_count": data.get("total_earned_count"),
-        "credits": normalised,
-        "note": "Endpoint is undocumented and may change. Token is not printed.",
-    }
+    from pulsedeck.codex_rpc import find_binary, read_account, resets_report
+    binary = find_binary()
+    if binary is None:
+        return {"ok": False, "error": {"message": "Codex client not found; Reset Credits are unavailable."}}
+    try:
+        report = resets_report(read_account(binary, reset_credits_only=True))
+    except (OSError, ValueError, TimeoutError):
+        return {"ok": False, "error": {"message": "Reset Credits could not be read. Check Codex sign-in or retry later."}}
+    if report is None:
+        report = {"ok": True, "source": "codex_app_server", "available_count": None,
+                  "credits": [], "details_available": False, "reason": "not_provided",
+                  "retrieved_at_unix_ms": round(datetime.now().timestamp() * 1000)}
+    return {**report, "refresh_seconds": RESET_CREDITS_REFRESH_SECONDS,
+            "note": "Read-only account query. Reset credits are never consumed by PulseDeck."}
 
 
 def normalise_credit_for_json(credit: dict[str, Any]) -> dict[str, Any]:
@@ -683,7 +671,7 @@ def print_resets(reset_data: dict[str, Any], warn_days: int = 7) -> None:
 
     credits = reset_data.get("credits", [])
     if not credits:
-        print("No reset credits were found in the server response.")
+        print("No reset-credit detail rows were returned; use the available count above.")
         return
 
     rows: list[list[str]] = []
@@ -715,10 +703,10 @@ def print_resets(reset_data: dict[str, Any], warn_days: int = 7) -> None:
         "Reset endpoint details",
         ["Metric", "Value"],
         [
-            ["Endpoint", "/backend-api/wham/rate-limit-reset-credits"],
-            ["Method", "GET"],
-            ["Auth file", f"{AUTH_PATH} (token is not printed)"],
-            ["Endpoint status", "undocumented; may change"],
+            ["Endpoint", "Codex account/rateLimits/read"],
+            ["Method", "Read-only Codex app-server RPC"],
+            ["Authentication", "Existing Codex client sign-in"],
+            ["Reset consumption", "Not supported by PulseDeck"],
         ],
     )
 
