@@ -85,12 +85,13 @@ class ProgressiveRefreshTest(unittest.TestCase):
         self.assertEqual(result['method'], 'GET')
         self.assertNotIn('isambard_force_refresh', result['url'])
 
-    def test_history_stays_local_when_reset_credit_exception_is_enabled(self):
+    def test_reset_failure_keeps_local_history_and_surfaces_its_message(self):
         result = self.run_js('''
         const requests=[];
         global.fetch=async url=>{
-          requests.push(Object.fromEntries(new URL(url,'http://local').searchParams));
-          return {ok:true,status:200,json:async()=>({ok:true,data:{}})};
+          const request=Object.fromEntries(new URL(url,'http://local').searchParams);requests.push(request);
+          const reset=request.report==='resets';
+          return {ok:true,status:200,json:async()=>({ok:!reset,errors:[],data:reset?{error:{message:'Reset lookup failed'}}:{local:true}})};
         };
         DashboardRefresh.run({report:'all',range:'7d',rangeAnchor:'2026-10-01',days:'30',
           sources:['codex','claude'],resetCreditsNetworkEnabled:true},()=>{})
@@ -99,6 +100,9 @@ class ProgressiveRefreshTest(unittest.TestCase):
         self.assertEqual({r['report'] for r in result['requests']}, {'local-usage','claude-usage','resets'})
         self.assertTrue(all(r['range']=='7d' and r['range_anchor']=='2026-10-01' for r in result['requests']))
         self.assertEqual(result['last']['range'], '7d')
+        self.assertEqual(result['last']['errors'], [{'section':'reset_credits','message':'Reset lookup failed'}])
+        self.assertTrue(result['last']['data']['local_usage']['local'])
+        self.assertTrue(result['last']['data']['claude_usage']['local'])
 
     def test_cancelled_refresh_stops_queued_source_requests(self):
         result = self.run_js("""

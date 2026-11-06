@@ -58,17 +58,19 @@ class CollectionTest(unittest.TestCase):
             self.assertEqual(claude.call_count, 3)
             self.assertEqual(codex.call_args.kwargs['anchor'], claude.call_args.kwargs['anchor'])
 
-    def test_reset_account_lookup_is_cached_for_five_minutes_across_ranges(self):
-        now=[0]
-        cache=sources.SourceCache(lambda:now[0])
-        with patch.object(web.codex_usage,'collect_resets',return_value={'ok':True,'available_count':3}) as collect:
-            self.report('resets',source_cache=cache,range_name='today')
-            now[0]=299
-            self.report('resets',source_cache=cache,range_name='all')
-            self.assertEqual(collect.call_count,1)
-            now[0]=301
-            self.report('resets',source_cache=cache,range_name='7d')
-            self.assertEqual(collect.call_count,2)
+    def test_reset_account_lookup_caches_success_and_failure_for_five_minutes(self):
+        for response in ({'ok':True,'available_count':3}, {'ok':False,'error':{'message':'offline'}}):
+            with self.subTest(response=response):
+                now=[0]
+                cache=sources.SourceCache(lambda:now[0])
+                with patch.object(web.codex_usage,'collect_resets',return_value=response) as collect:
+                    self.report('resets',source_cache=cache,range_name='today')
+                    now[0]=299
+                    self.report('resets',source_cache=cache,range_name='all')
+                    self.assertEqual(collect.call_count,1)
+                    now[0]=301
+                    self.report('resets',source_cache=cache,range_name='7d')
+                    self.assertEqual(collect.call_count,2)
 
     def test_live_isambard_survives_cache_write_failure(self):
         with tempfile.TemporaryDirectory() as directory:

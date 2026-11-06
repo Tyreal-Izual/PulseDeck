@@ -43,7 +43,8 @@ committed to Git.
 
 The packaged self-check tests included assets, the .NET bridge, authenticated
 activation and backend shutdown. It does not query account services or collect
-personal history. Source tests cover lifecycle ownership and navigation policy.
+personal history. Its JSON reports the general account-network flag and the
+Reset Credits exception separately. Source tests cover lifecycle ownership and navigation policy.
 
 ## Packaging
 

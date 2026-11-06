@@ -85,7 +85,8 @@ const DashboardRefresh = (() => {
                                         settings.range, settings.rangeAnchor);
           data[name] = payload.data;
           if (!payload.ok) {
-            failures[name] = {section: name, message: payload.errors?.map(e => e.message).join('; ') || 'Source unavailable'};
+            failures[name] = {section: name, message: payload.errors?.map(e => e.message).join('; ')
+              || payload.data?.error?.message || 'Source unavailable'};
           }
         } catch (error) {
           const message = error.name === 'AbortError' ? 'Request timed out' : String(error.message || error);

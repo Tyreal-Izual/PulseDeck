@@ -620,7 +620,6 @@ __USAGE_SCRIPT__
       const report = payload.report;
       const data = payload.data || {};
       const sections = splitSections(data, report);
-      sections.retrieved = data.retrieved_at_local || payload.served_at_local || "-";
       if (!dashboardConfig.sources.includes("isambard")) {
         sections.isambard = report === "isambard-status" ? {ok:true, disabled:true, source:"isambard"} : null;
       }
@@ -635,25 +634,19 @@ __USAGE_SCRIPT__
 
 
       const warnings = [];
-      if (Array.isArray(payload.errors)) {
-        payload.errors.filter(item => item.section !== "isambard_status" || dashboardConfig.sources.includes("isambard")).forEach((item) => warnings.push(`${item.section || "report"}: ${item.message || item}`));
-      }
+      const reportErrors = Array.isArray(payload.errors) ? payload.errors : [];
+      const reportedErrors = new Set(reportErrors.map(item => item.section));
+      const sourceNames = {local:"local_usage", claude:"claude_usage", resets:"reset_credits", isambard:"isambard_status"};
+      reportErrors.filter(item => item.section !== "isambard_status" || dashboardConfig.sources.includes("isambard")).forEach((item) => warnings.push(`${item.section || "report"}: ${item.message || item}`));
       for (const [name, sectionData] of Object.entries(sections)) {
-        if (name === "retrieved" || !sectionData || typeof sectionData !== "object") {
+        if (!sectionData || typeof sectionData !== "object") {
           continue;
         }
-        if (sectionData.ok === false) {
-          warnings.push(`${name}: ${summarizeError(sectionData.error || "not available")}`);
+        if (sectionData.ok === false && !reportedErrors.has(sourceNames[name])) {
+          warnings.push(`${sourceNames[name] || name}: ${summarizeError(sectionData.error || "not available")}`);
         }
         if (sectionData.warning) {
           warnings.push(`${name}: ${summarizeError(sectionData.warning)}`);
-        }
-        if (sectionData.endpoints && typeof sectionData.endpoints === "object") {
-          for (const [endpointName, endpoint] of Object.entries(sectionData.endpoints)) {
-            if (endpoint && endpoint.ok === false) {
-              warnings.push(`${name}.${endpointName}: ${summarizeError(endpoint.error || "not available")}`);
-            }
-          }
         }
       }
       showNotice(warnings);

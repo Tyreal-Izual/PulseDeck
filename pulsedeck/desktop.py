@@ -176,7 +176,7 @@ def run() -> int:
 
 def self_check(output: Path) -> int:
     """Packaged smoke check: assets, local authentication and cleanup; no account/network sources."""
-    from .privacy import ACCOUNT_NETWORK_ENABLED
+    from .privacy import ACCOUNT_NETWORK_ENABLED, RESET_CREDITS_NETWORK_ENABLED
     import dashboard_assets
     import webview  # verifies that the package includes the desktop dependency
     import clr  # verifies the .NET bridge, without creating a window
@@ -195,6 +195,7 @@ def self_check(output: Path) -> int:
                 result = {"ok": True, "presentation": info["presentation"],
                           "assets": "<title>PulseDeck</title>" in dashboard_assets.load_page("index"),
                           "account_network_enabled": ACCOUNT_NETWORK_ENABLED,
+                          "reset_credits_network_enabled": RESET_CREDITS_NETWORK_ENABLED,
                           "activation": activated.is_set()}
             finally:
                 backend.close()

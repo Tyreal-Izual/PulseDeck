@@ -239,8 +239,8 @@ function resetCreditsMarkup(resets) {
 }
 
 function renderCodexQuota(local, resets) {
-  const rate = local?.rate_limits;
-  if (!rate) return [];
+  if (!local?.rate_limits && (!resets || resets.disabled)) return [];
+  const rate = local?.rate_limits || {};
   const extras = [
     {label:t("updated"), valueHtml:quotaAgeMarkup(rate)},
     {label:t("status"), valueHtml:quotaStateMarkup(rate)},
