@@ -659,7 +659,7 @@ __USAGE_SCRIPT__
       const overview = report === "all";
       const loadingPanels = (payload.pending || []).filter(name => !data[name] && (name !== "isambard_status" || dashboardConfig.sources.includes("isambard"))).map(name => panel(
         {local_usage:"Codex", claude_usage:"Claude Code", isambard_status:"Isambard"}[name] || name,
-        t("loadingSources"), `<div class="empty" role="status">${esc(t("refreshing"))}…</div>`, false, `loading-${name}`));
+        t("loadingSources"), `<div class="empty" role="status">${esc(t("refreshing"))}…</div>`, name === "isambard_status", `loading-${name}`));
       const disabledPanels = [...new Set(disabled)].map(source => panel(
         source === "claude" ? "Claude Code" : source === "codex" ? "Codex" : "Isambard",
         t("sourceDisabled"), `<div class="empty">${esc(t("sourceDisabled"))}</div>`, false, `disabled-${source}`));
@@ -668,8 +668,9 @@ __USAGE_SCRIPT__
             [{label:t("updated"),valueHtml:'<span data-radar-age>—</span>'}]) : null;
       const panels = [
         ...renderCodexQuota(sections.local), ...renderClaudeQuota(sections.claude),
+        ...renderIsambard(sections.isambard), ...loadingPanels.filter(p => p.title === "loading-isambard_status"),
         ...renderLocal(sections.local, overview), ...renderUsage(sections.claude?.local_usage, "claude", overview),
-        ...loadingPanels, ...disabledPanels, ...renderIsambard(sections.isambard),
+        ...loadingPanels.filter(p => p.title !== "loading-isambard_status"), ...disabledPanels,
         collapsePanel(radar, "radar-details", "Radar · " + t("moduleScores"))
       ];
       const expanded = new Set([...document.querySelectorAll("[data-disclosure][open]")].map(node => node.dataset.disclosure));
