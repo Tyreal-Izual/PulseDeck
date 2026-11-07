@@ -1,7 +1,6 @@
 """Standalone Windows window. The embedded backend is owned by this process."""
 from __future__ import annotations
 
-import errno
 import json
 import logging
 from logging.handlers import RotatingFileHandler
@@ -15,7 +14,7 @@ import urllib.parse
 import webbrowser
 
 from .runtime import (InstanceLock, Runtime, access_url, data_directory,
-                      local_request, read_session)
+                      local_request, port_unavailable, read_session)
 
 LOGGER = logging.getLogger("pulsedeck.desktop")
 
@@ -55,7 +54,7 @@ class DesktopBackend:
         try:
             self.runtime = Runtime(port=port, **options)
         except OSError as error:
-            if port != 8766 or error.errno not in {errno.EADDRINUSE, 10048}:
+            if port != 8766 or not port_unavailable(error):
                 raise
             self.runtime = Runtime(port=0, **options)
         self.error = None

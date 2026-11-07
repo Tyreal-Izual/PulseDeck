@@ -19,9 +19,19 @@ Codex account lookup. Isambard and Radar still fetch public
 information. Version 0.4 uses [event accounting and unified time ranges](local-usage.md).
 
 Runtime state, bounded error logs, and WebView preferences live under
-`%LOCALAPPDATA%\PulseDeck\desktop`. The desktop backend normally uses port 8766
-and chooses a free port if it is occupied. The older browser/CLI entry remains
-available for development, using separate session state.
+`%LOCALAPPDATA%\PulseDeck\desktop`. The desktop backend normally uses port 8766;
+the browser entry uses 8765. If its default port is unavailable, it retries once
+with port 0 so Windows selects a free port, and records that actual port in the
+session state. Nondefault fixed ports and unrelated startup errors still fail.
+
+Windows listeners use `SO_EXCLUSIVEADDRUSE` before binding, with address/port
+sharing disabled. Both address-in-use errors and Windows `EACCES` / Winsock
+10013 and 10048 trigger default-port fallback. This covers occupied or excluded
+ports without joining another process's listener. POSIX retains address reuse
+for normal restarts, but never enables `SO_REUSEPORT`.
+See [Microsoft's socket binding documentation](https://learn.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse).
+The older browser/CLI entry remains available for development, using separate
+session state.
 
 ## Build
 

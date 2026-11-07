@@ -182,11 +182,21 @@ def host_is_allowed(host_header: str | None, allowed: set[str], port: int) -> bo
 class BoundedThreadingHTTPServer(ThreadingHTTPServer):
     """Threading HTTP server that rejects work before spawning excess threads."""
 
+    # Winsock SO_REUSEADDR can attach to another active listener. Use exclusive
+    # binding on Windows; keep POSIX address reuse for normal TIME_WAIT restarts.
+    allow_reuse_address = sys.platform != "win32"
+    allow_reuse_port = False
+
     def __init__(self, *args: Any, max_workers: int, **kwargs: Any) -> None:
         if max_workers < 1:
             raise ValueError("max_workers must be at least one")
         self._request_slots = threading.BoundedSemaphore(max_workers)
         super().__init__(*args, **kwargs)
+
+    def server_bind(self) -> None:
+        if sys.platform == "win32":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
     def process_request(self, request: Any, client_address: Any) -> None:
         if not self._request_slots.acquire(blocking=False):

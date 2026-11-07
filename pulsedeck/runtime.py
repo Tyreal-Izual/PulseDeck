@@ -1,6 +1,7 @@
 """Local application lifecycle, independent of the browser launcher."""
 from __future__ import annotations
 
+import errno
 import json
 import os
 import secrets
@@ -18,6 +19,15 @@ from usage_common import atomic_write_json, cache_directory
 from usage_sources import resolve_sources
 
 ROOT = Path(__file__).resolve().parent.parent
+
+def port_unavailable(error: OSError) -> bool:
+    """Bind conflicts, including Windows exclusive/excluded-port access errors."""
+    if error.errno == errno.EADDRINUSE:
+        return True
+    return sys.platform == "win32" and (
+        error.errno in {errno.EACCES, 10013, 10048}
+        or getattr(error, "winerror", None) in {10013, 10048}
+    )
 
 def data_directory() -> Path:
     override = os.environ.get("PULSEDECK_DATA_DIR")
@@ -153,7 +163,7 @@ class Runtime:
             self.server = web.create_server("127.0.0.1", port, **options)
         except OSError as exc:
             # A busy default port should not prevent a local app from starting.
-            if port != 8765 or exc.errno not in {48, 98, 10048}:
+            if port != 8765 or not port_unavailable(exc):
                 raise
             self.server = web.create_server("127.0.0.1", 0, **options)
         self.server.RequestHandlerClass = Handler
