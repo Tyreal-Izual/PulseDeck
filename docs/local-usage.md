@@ -1,5 +1,7 @@
 # Local usage accounting (0.4)
 
+[English overview](../README.md) · [中文入门](../README.zh-CN.md)
+
 PulseDeck reads Codex `sessions/` and `archived_sessions/`, and Claude
 `projects/` JSONL files. These statistics never call account APIs, launch an auth client,
 or upload usage. Reset Credits have the separate read-only exception below. Isambard and Radar remain separate public sources.

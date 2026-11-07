@@ -164,7 +164,7 @@ function quotaCountdown(reset, now = Date.now()) {
   const days = Math.floor(seconds / 86400);
   const clock = [Math.floor(seconds / 3600) % 24, Math.floor(seconds / 60) % 60, seconds % 60]
     .map(value => String(value).padStart(2, "0")).join(":");
-  return `${t("resetsIn")} ${days ? days + " " + t("day") + " " : ""}${clock}`;
+  return `${t("resetsIn")} ${days ? days + " " + t(days === 1 ? "day" : "daysUnit") + " " : ""}${clock}`;
 }
 
 function quotaBar(source, key, window, label) {

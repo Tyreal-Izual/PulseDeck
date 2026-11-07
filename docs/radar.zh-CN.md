@@ -1,10 +1,10 @@
 # Codex 降智雷达
 
-[返回快速开始](../README.zh-CN.md)
+[English](radar.md) · [中文快速开始](../README.zh-CN.md)
 
 Radar 默认启用，可通过工具栏复选框暂停或恢复采集。`codex_radar.py` 负责采集与缓存，
-`static/radar.js` 和 `static/radar.css` 负责卡片展示。存在 Banked Resets 卡片时放在
-它的下方，也支持只启用 Radar 来源。
+`static/radar.js` 和 `static/radar.css` 负责卡片展示。Radar 默认折叠在总览和 Codex
+页面的用量卡片下方，也支持只启用 Radar 来源。
 
 ## 当前数据源与展示
 
@@ -57,8 +57,8 @@ python3 codex_radar.py --cache /tmp/radar.json
 修改运行中服务的内存数据，也应避免两个进程同时写同一缓存。
 
 ```sh
-python3 codex_radar.py --cache /tmp/codex-usage-cache/codex_radar_snapshot.json --force
-python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache
+python3 codex_radar.py --cache .local/cache/codex_radar_snapshot.json --force
+python3 codex_claude_usage_web.py --cache-dir .local/cache
 ```
 
 代码升级后需要重启网页服务，无需另设定时任务。分数来自社区评测，不代表账户用量或官方模型评分。

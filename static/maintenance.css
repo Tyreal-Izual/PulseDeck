@@ -48,6 +48,9 @@
     h1 { margin: 0; font-size: 28px; }
 
     .meta { margin: 6px 0 0; color: var(--muted); }
+    .controls { display:flex;align-items:center;flex-wrap:wrap;gap:10px; }
+    .controls label { display:flex;align-items:center;gap:8px;color:var(--muted); }
+    select { min-height:38px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);font:inherit; }
 
     button {
       min-height: 38px;

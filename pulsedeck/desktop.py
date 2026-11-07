@@ -72,9 +72,9 @@ class DesktopBackend:
     def start(self):
         self.thread.start()
         if not self.runtime.ready.wait(5):
-            raise RuntimeError("本地采集模块启动超时。")
+            raise RuntimeError("The local backend did not start in time.")
         if self.error:
-            raise RuntimeError("本地采集模块未能启动。") from self.error
+            raise RuntimeError("The local backend could not start.") from self.error
         return access_url(self.runtime.session)
 
     def close(self):
@@ -114,7 +114,7 @@ def attach_navigation_policy(window, port: int):
 
 def run() -> int:
     if sys.platform != "win32":
-        raise RuntimeError("此桌面版面向 Windows；其他系统可继续使用本地浏览器入口。")
+        raise RuntimeError("This desktop app requires Windows. Use the browser entry on other systems.")
     lock = InstanceLock(desktop_directory() / "instance.lock")
     try:
         lock.__enter__()
@@ -124,7 +124,7 @@ def run() -> int:
             if activate_existing():
                 return 0
             time.sleep(0.2)
-        raise RuntimeError("PulseDeck 已在启动或运行，请稍后再试。")
+        raise RuntimeError("PulseDeck is already starting or running. Please try again shortly.")
 
     backend = None
     try:
@@ -229,8 +229,8 @@ def main(argv=None) -> int:
         if not args and sys.platform == "win32":
             import ctypes
             ctypes.windll.user32.MessageBoxW(
-                None, "PulseDeck 未能启动。\n\n" + str(error)
-                + "\n\n日志：" + str(folder / "desktop.log"), "PulseDeck", 0x10)
+                None, "PulseDeck could not start.\n\n" + str(error)
+                + "\n\nLog: " + str(folder / "desktop.log"), "PulseDeck", 0x10)
         return 1
     finally:
         handler.close()

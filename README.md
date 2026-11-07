@@ -1,14 +1,16 @@
 # PulseDeck
 
-> Current policy (0.4.6): token history and quota windows remain local. Reset Credits alone use the signed-in Codex client for a read-only account lookup, cached for five minutes. Profile, account token history, Admin API and legacy HTTP account requests remain disabled. Isambard/Radar use public sources.
+**English** · [简体中文](README.zh-CN.md)
+
+> Data access policy: token history and quota windows remain local. Reset Credits alone use the signed-in Codex client for a read-only account lookup, cached for five minutes. Profile, account token history, Admin API and legacy HTTP account requests remain disabled. Isambard/Radar use public sources.
 
 **Your local dashboard for AI usage, infrastructure status, and model intelligence.**
 
 PulseDeck runs on your Windows computer and brings together four independent modules:
 
-| Module | First release |
+| Module | Data shown |
 | --- | --- |
-| Codex | Local token/model/session history; no account-network queries |
+| Codex | Local token/model/session history and quota snapshots; read-only Reset Credits lookup |
 | Claude Code | Local token/model/project history; subscription quotas when a capture is available |
 | Isambard | Public service status and planned maintenance |
 | Radar | Current community degradation scores, source test period, cached fallback |
@@ -23,8 +25,11 @@ Build from source with `Build-Desktop.ps1`; the result is `dist/PulseDeck.exe`.
 Windows desktop builds are also produced by the **Windows desktop EXE** GitHub
 Actions workflow. See [desktop build and runtime notes](docs/desktop.md).
 
-The desktop window uses Microsoft Edge WebView2 Runtime, already present on
-the development PC. It runs with normal user permissions.
+The desktop window uses Microsoft Edge WebView2 Runtime. It runs with normal user permissions.
+
+The interface defaults to **English**, regardless of the Windows or browser language.
+Select **简体中文** from the **Language** menu to use Chinese. Both the dashboard
+and maintenance page share the saved selection; an existing explicit choice is preserved.
 
 ## Browser / source entry
 
@@ -88,7 +93,7 @@ Existing standalone collectors remain UI-independent and keep their regression t
 The desktop window and browser entry share the same collectors. Desktop lifecycle
 and window activation live in `pulsedeck/desktop.py`.
 
-See [Windows development notes](docs/pulsedeck.md), [upstream dashboard API](WEB_DASHBOARD.md),
+See [Windows development notes](docs/pulsedeck.md), [dashboard configuration and API](WEB_DASHBOARD.md),
 [Claude capture details](docs/claude-setup.md), and [Radar rules](docs/radar.md).
 Some inherited documents and screenshots retain the original Codex-Usage name.
 

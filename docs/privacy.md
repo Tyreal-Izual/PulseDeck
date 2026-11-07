@@ -1,6 +1,6 @@
 # Privacy and limitations
 
-[Quick start](../README.md)
+[English overview](../README.md) · [中文入门](../README.zh-CN.md)
 
 - The server listens on `127.0.0.1` by default.
 - Codex and Claude transcript/state files are read but not modified; the Claude

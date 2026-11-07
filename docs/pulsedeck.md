@@ -1,5 +1,7 @@
 # PulseDeck development
 
+[English overview](../README.md) · [中文入门](../README.zh-CN.md)
+
 > Current policy: token history and quota windows are local. Only Reset Credits may use the read-only Codex account method, with a five-minute cache. All other account-network paths remain disabled; Isambard/Radar public fetches are independent.
 
 ## Boundaries

@@ -1,6 +1,6 @@
 # Claude Code Setup
 
-[Back to quick start](../README.md)
+[English overview](../README.md) · [简体中文](claude-setup.zh-CN.md)
 
 ### Local token history
 
@@ -17,8 +17,9 @@ directory.
 
 ### Official 5-hour and 7-day windows
 
-To capture the official subscription windows exposed to Claude Code
-statusLine scripts, register the included bridge once:
+On Windows, run **Setup-Claude-Capture.cmd** from the project folder.
+The script preserves an existing custom statusLine. The source command below is
+also available to register the bridge for a compatible Claude Code client:
 
 ```sh
 python3 claude_usage_statusline.py --install
@@ -50,15 +51,15 @@ python3 claude_usage_statusline.py --uninstall
 > becomes stale. The dashboard displays snapshot age and stale state so an old
 > value is not mistaken for live account usage.
 
-The dashboard also runs the local `claude auth status` command and exposes only
-redacted state fields. A successful authenticated check shows a green **CLI
-Login · Logged in** chip. An explicit logged-out result shows a red re-login
-warning only after the rate-limit snapshot is stale or unavailable, with
-`claude auth login` as the recovery command. Missing binaries, timeouts, and
-unrecognised auth output remain neutral instead of producing a false green or
-red status.
+PulseDeck does not run `claude auth status`, start a hidden Claude session, or
+query Claude account endpoints. Missing snapshots remain unavailable; signing
+in or refreshing the dashboard alone does not create a quota capture.
 
-### Optional background snapshot refresh on macOS
+### Optional standalone refresher on macOS
+
+This separate CLI helper is not started by PulseDeck and is not part of the
+Windows desktop runtime. Running or installing it is an explicit user action;
+the normal Claude client may make its own network requests.
 
 `claude_usage_refresher.py` opens a temporary empty Claude Code session for this
 repository, runs Claude Code's local `/usage` command, parses only the 5-hour

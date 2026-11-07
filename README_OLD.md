@@ -2,7 +2,9 @@
 
 > Archived CLI guide for the upstream-derived `codex_usage.py`. The layout and
 > screenshots below describe the original CLI project. For the current combined
-> dashboard, setup, and tests, see [README.md](README.md).
+> dashboard, setup, and tests, see [README.md](README.md) ([简体中文](README.zh-CN.md)).
+> This is historical reference, not the current network policy: profile and
+> Admin API workflows described below are disabled in PulseDeck.
 
 Codex Usage is a local command-line tool for people who want a clear view of their Codex reset credits, rate-limit windows, local usage metadata, read-only online usage/profile data and optional OpenAI API organisation usage.
 

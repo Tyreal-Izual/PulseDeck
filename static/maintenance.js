@@ -1,13 +1,17 @@
+__PREFERENCES_SCRIPT__
 const state = {
       loading: false,
       disabled: false,
-      lang: localStorage.getItem("codexUsageLanguage") || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en")
+      failed: false,
+      lastPayload: null,
+      lang: PulseDeckPreferences.language()
     };
 
     const $ = (id) => document.getElementById(id);
     const TEXT = {
       en: {
         back: "← Back to Dashboard",
+        language: "Language",
         title: "Planned Maintenance",
         schedule: "Maintenance Schedule",
         refresh: "Refresh Source",
@@ -17,11 +21,12 @@ const state = {
         fetchedAt: "Source Fetched",
         liveFetch: "Live Fetch",
         cachedData: "Cached Result",
-        disabled: "Isambard is not enabled. Start the dashboard with --sources all or --sources isambard.",
+        disabled: "Isambard is disabled. Enable Isambard Status on the dashboard.",
         failed: "Could not load maintenance details."
       },
       zh: {
         back: "← 返回仪表盘",
+        language: "语言",
         title: "计划维护",
         schedule: "维护计划",
         refresh: "刷新源数据",
@@ -31,7 +36,7 @@ const state = {
         fetchedAt: "源数据抓取时间",
         liveFetch: "实时抓取",
         cachedData: "缓存结果",
-        disabled: "Isambard 未启用，请使用 --sources all 或 --sources isambard 启动仪表盘。",
+        disabled: "Isambard 未启用，请在首页勾选 Isambard Status。",
         failed: "无法加载维护详情。"
       }
     };
@@ -51,10 +56,11 @@ const state = {
 
     function applyLanguage() {
       document.documentElement.lang = state.lang === "zh" ? "zh-CN" : "en";
-      document.title = `${t("title")} · Codex & Claude Code Usage Dashboard`;
+      document.title = `${t("title")} · PulseDeck`;
       document.querySelectorAll("[data-i18n]").forEach((node) => {
         node.textContent = t(node.dataset.i18n);
       });
+      $("language").value = state.lang;
     }
 
     function showNotice(lines) {
@@ -75,6 +81,7 @@ const state = {
     }
 
     function render(payload) {
+      state.lastPayload = payload;
       const data = payload.data || {};
       const snapshot = data.status || {};
       const headers = Array.isArray(snapshot.maintenance_headers) ? snapshot.maintenance_headers : [];
@@ -96,6 +103,7 @@ const state = {
         return;
       }
       state.loading = true;
+      state.disabled = state.failed = false;
       $("refresh").disabled = true;
       $("refresh").textContent = t("refreshing");
       try {
@@ -121,15 +129,27 @@ const state = {
         }
         render(payload);
       } catch (error) {
+        state.failed = true;
         showNotice([error.message || t("failed")]);
         $("content").innerHTML = `<div class="empty">${esc(t("failed"))}</div>`;
+        $("meta").textContent = "";
       } finally {
         state.loading = false;
-        $("refresh").disabled = state.disabled;
+        $("refresh").disabled = false;
         $("refresh").textContent = t("refresh");
       }
     }
 
     applyLanguage();
-    $("refresh").addEventListener("click", () => load(true));
+    $("language").addEventListener("change", () => {
+      state.lang = PulseDeckPreferences.setLanguage($("language").value);
+      applyLanguage();
+      if (state.disabled || state.failed) {
+        $("content").innerHTML = `<div class="empty">${esc(t(state.disabled ? "disabled" : "failed"))}</div>`;
+      } else if (state.lastPayload) {
+        render(state.lastPayload);
+      }
+      if (state.loading) $("refresh").textContent = t("refreshing");
+    });
+    $("refresh").addEventListener("click", () => load(!state.disabled));
     load();

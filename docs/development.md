@@ -6,6 +6,9 @@
 
 | Path | Responsibility |
 | --- | --- |
+| `pulsedeck/runtime.py`, `pulsedeck/desktop.py` | Local lifecycle, exclusive binding, single-instance desktop shell |
+| `pulsedeck/local_usage.py`, `pulsedeck/local_quota.py` | Incremental event accounting and local quota snapshots |
+| `pulsedeck/codex_rpc.py` | Read-only Reset Credits query; other account access remains blocked |
 | `codex_claude_usage_web.py` | Authenticated HTTP server, report composition and startup options |
 | `codex_usage.py` | Upstream-derived Codex collector, terminal reports and exports |
 | `claude_usage.py` | Claude usage metadata and local limit snapshots |
@@ -20,9 +23,11 @@
 | `test_*.py` | Standard-library regression tests |
 
 The source files are separated for editing, then assembled into authenticated
-HTML responses at startup. There is no public filesystem route, build step,
-third-party runtime dependency or need to install a package. Restart after edits.
-Keep the checkout together; copying only an entry-point script is insufficient.
+HTML responses at startup, with no frontend build step or public filesystem route.
+The browser entry uses the Python standard library. Building the Windows EXE
+requires the pinned desktop dependencies in `requirements-desktop.txt`; the
+finished EXE includes them. Restart after edits. Keep the checkout together;
+copying only an entry-point script is insufficient.
 
 ## Tests
 
@@ -49,7 +54,7 @@ they do not establish visual correctness on every browser.
 ## Behavior to preserve
 
 - CLI entry points, report keys, API authentication and source privacy boundaries.
-- Cumulative Codex token totals use the final valid record, not the sum of snapshots.
+- Codex totals reconcile per-response usage with cumulative snapshot deltas; duplicate snapshots are not summed again.
 - Claude duplicate identities are counted once, including across subagent files.
 - File growth, truncation, replacement and deletion invalidate/reconcile caches.
 - A source cache coalesces matching work without blocking unrelated sources.
@@ -60,5 +65,7 @@ they do not establish visual correctness on every browser.
 - Old IQ/RadarBench caches are never displayed; only current degradation snapshots are fallback.
 - Radar cards use a fixed score/150 bar scale in both languages; zero and missing scores differ.
 - Transient network retries are bounded and interruptible; invalid pages are not retried immediately.
-- No history charts, metric selectors or cost/time columns are rendered.
+- Radar has no history charts, metric selectors or cost/time columns; local token history has its own daily chart.
+- English is the initial UI language. Both pages use the shared preference helper and support Chinese.
+- Windows listeners are exclusive; default-port conflicts may fall back to an OS-assigned port.
 - Core collectors raise structured errors; only the CLI prints its error messages.

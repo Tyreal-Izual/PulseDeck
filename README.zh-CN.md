@@ -1,10 +1,15 @@
 # PulseDeck
 
-> 0.4.6 当前策略：Token 历史和额度窗口继续仅读取本地；仅 Reset Credits 通过已登录的 Codex 客户端做只读账户查询，每 5 分钟最多一次，不消耗重置券。其他账户统计、Admin API 和旧内部 HTTP 接口仍停用，Isambard/Radar 公共数据正常更新。
+[English](README.md) · **简体中文**
+
+> 数据访问策略：Token 历史和额度窗口继续仅读取本地；仅 Reset Credits 通过已登录的 Codex 客户端做只读账户查询，每 5 分钟最多一次，不消耗重置券。其他账户统计、Admin API 和旧内部 HTTP 接口仍停用，Isambard/Radar 公共数据正常更新。
 
 集中查看 Codex、Claude Code 用量、Isambard 服务状态和 Radar 模型评测的本地面板。
 
 ## Windows 使用
+
+界面首次打开默认 **English**，不再跟随系统语言。可在 **Language** 菜单选择
+**简体中文**；首页和维护详情页共用并记住该选择，已保存的语言偏好会保留。
 
 - 双击 **PulseDeck.exe**：直接打开独立窗口，不需要终端或另开浏览器，也不需要单独安装 Python。
 - 再次双击会回到已有窗口；关闭窗口时停止桌面版自己的采集。

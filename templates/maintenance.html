@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Planned Maintenance · Codex &amp; Claude Code Usage Dashboard</title>
+  <title>Planned Maintenance · PulseDeck</title>
   <style>
 __CSS__
 </style>
@@ -16,7 +16,12 @@ __CSS__
         <h1 data-i18n="title">Planned Maintenance</h1>
         <p id="meta" class="meta"></p>
       </div>
-      <button id="refresh" type="button" data-i18n="refresh">Refresh Source</button>
+      <div class="controls">
+        <label><span data-i18n="language">Language</span>
+          <select id="language"><option value="en">English</option><option value="zh">简体中文</option></select>
+        </label>
+        <button id="refresh" type="button" data-i18n="refresh">Refresh Source</button>
+      </div>
     </header>
     <div id="notice" class="notice"></div>
     <section>

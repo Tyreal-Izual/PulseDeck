@@ -1,9 +1,15 @@
 # PulseDeck desktop
 
+[English overview](../README.md) · [中文入门](../README.zh-CN.md)
+
 Double-click `PulseDeck.exe` to open the standalone Windows window. It includes
 Python and its application dependencies. Windows needs .NET Framework 4.6.2+
 and Microsoft Edge WebView2 Runtime; both were available on the development PC.
 No terminal, separate browser, or administrator permission is needed.
+
+New profiles start in English. Use the Language selector on the dashboard or
+maintenance page to switch to Simplified Chinese. The two pages share the saved
+preference. Diagnostic and upstream source messages retain their original wording.
 
 The existing local dashboard is rendered inside the application window. Its
 authenticated loopback backend runs in the same application process. Closing

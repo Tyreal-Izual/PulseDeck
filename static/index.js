@@ -1,5 +1,6 @@
 __RADAR_SCRIPT__
 __REFRESH_SCRIPT__
+__PREFERENCES_SCRIPT__
     const dashboardConfig = __DASHBOARD_CONFIG__;
     const state = {
       timer: null,
@@ -11,7 +12,7 @@ __REFRESH_SCRIPT__
       pendingForceRefresh: false,
       lastPayload: null,
       initialPanelPositionPending: !window.location.hash || window.location.hash === "#codex-radar",
-      lang: localStorage.getItem("pulsedeckLanguage") || ((navigator.language || "").toLowerCase().startsWith("zh") ? "zh" : "en")
+      lang: PulseDeckPreferences.language()
     };
 
     const $ = (id) => document.getElementById(id);
@@ -839,7 +840,7 @@ __USAGE_SCRIPT__
       state.refreshController?.abort();
       state.lastPayload = null;
       $("sections").replaceChildren();
-      localStorage.setItem("pulsedeckRange", $("time-range").value);
+      PulseDeckPreferences.setRange($("time-range").value);
       const params = new URLSearchParams({report:$("report").value, range:$("time-range").value});
       history.replaceState(null, "", `/?${params}`);
       refresh();
@@ -850,8 +851,7 @@ __USAGE_SCRIPT__
     $("radar-enabled").addEventListener("change", event => toggleSource("radar", event.target.checked));
     $("auto").addEventListener("change", schedule);
     $("language").addEventListener("change", () => {
-      state.lang = $("language").value === "zh" ? "zh" : "en";
-      localStorage.setItem("pulsedeckLanguage", state.lang);
+      state.lang = PulseDeckPreferences.setLanguage($("language").value);
       applyLanguage();
       if (state.lastPayload) {
         render(state.lastPayload);
@@ -866,7 +866,7 @@ __USAGE_SCRIPT__
       }
     });
 
-    const requestedRange = new URLSearchParams(window.location.search).get("range") || localStorage.getItem("pulsedeckRange") || "30d";
+    const requestedRange = new URLSearchParams(window.location.search).get("range") || PulseDeckPreferences.range();
     $("time-range").value = ["today", "7d", "30d", "all"].includes(requestedRange) ? requestedRange : "30d";
     const requestedReport = new URLSearchParams(window.location.search).get("report") || dashboardConfig.defaultReport;
     if (requestedReport && Array.from($("report").options).some((option) => option.value === requestedReport)) {

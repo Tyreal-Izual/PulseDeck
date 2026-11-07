@@ -1,6 +1,6 @@
 # Claude Code 设置
 
-[返回快速开始](../README.zh-CN.md)
+[English](claude-setup.md) · [中文快速开始](../README.zh-CN.md)
 
 ### 本地 token 历史
 
@@ -15,8 +15,8 @@
 
 ### 官方 5 小时和 7 天窗口
 
-要保存 Claude Code 提供给 statusLine 脚本的官方订阅限额，需要注册一次随项目提供的
-桥接脚本：
+Windows 可运行项目目录中的 **Setup-Claude-Capture.cmd**，已有自定义 statusLine
+会被保留。也可以使用下面的源码命令，为兼容的 Claude Code 客户端注册桥接脚本：
 
 ```sh
 python3 claude_usage_statusline.py --install
@@ -44,13 +44,13 @@ python3 claude_usage_statusline.py --uninstall
 > 却不调用自定义 statusLine。此时 token 图表会继续更新，但 5 小时/7 天限额快照会
 > 逐渐过期。页面会显示 snapshot age 和 stale 状态，避免把旧数据误认为账户实时用量。
 
-页面还会执行本地 `claude auth status`，并且只返回经过脱敏的状态字段。认证检查明确成功
-时，标题会显示绿色的 **CLI 登录 · 已登录**；认证检查明确返回未登录，并且限额快照已经
-过期或不可用时，页面才显示红色的重新验证提示，并给出 `claude auth login` 恢复命令。
-如果找不到 Claude 可执行文件、检查超时或认证输出无法识别，页面保持中性，不会显示
-错误的绿色或红色结论。
+PulseDeck 不执行 `claude auth status`，不启动隐藏的 Claude 会话，也不查询 Claude
+账户接口。快照缺失时会明确显示不可用；仅登录客户端或刷新面板不会自动生成额度快照。
 
-### macOS 可选后台快照刷新
+### macOS 可选独立刷新器
+
+该 CLI 工具不会由 PulseDeck 自动启动，也不属于 Windows 桌面版运行流程。
+只有用户明确运行或安装时才会执行，正常 Claude 客户端可能发起自己的网络请求。
 
 `claude_usage_refresher.py` 会在本仓库打开一个临时空白 Claude Code 会话，执行本地
 `/usage` 命令，只解析 5 小时与 weekly 的百分比/reset 时间，写入同样经过筛选的快照

@@ -11,4 +11,5 @@ def asset_text(relative_path: str) -> str:
 def load_page(name: str) -> str:
     return (asset_text(f"templates/{name}.html")
             .replace("__CSS__", asset_text(f"static/{name}.css"))
-            .replace("__JS__", asset_text(f"static/{name}.js")))
+            .replace("__JS__", asset_text(f"static/{name}.js"))
+            .replace("__PREFERENCES_SCRIPT__", asset_text("static/preferences.js")))

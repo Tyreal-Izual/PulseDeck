@@ -1,15 +1,15 @@
 # Codex degradation radar
 
-[Back to quick start](../README.md)
+[English overview](../README.md) · [简体中文](radar.zh-CN.md)
 
 Radar is enabled by default; use its toolbar checkbox to pause/resume collection.
 `codex_radar.py` owns collection and caching; `static/radar.js` and `static/radar.css`
-render the cards. The panel appears below Banked Resets when present and also
-works when Radar is the only enabled source.
+render the cards. Radar is a collapsed section below the usage cards on the
+overview and Codex pages. It also works when Radar is the only enabled source.
 
 ## Current source and display
 
-On the source site, open **模型智商 (Model intelligence)** → **降智雷达**.
+On the source site, open **模型智商 (Model intelligence)** → **降智雷达 (Degradation radar)**.
 This is a homepage tab, not a separate data URL; the totals remain in the initial
 HTML, so collection does not require browser navigation or JavaScript.
 
@@ -74,8 +74,8 @@ standalone cache update, then restart it; the command does not update a running
 service's memory and two processes should not write the same cache concurrently.
 
 ```sh
-python3 codex_radar.py --cache /tmp/codex-usage-cache/codex_radar_snapshot.json --force
-python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache
+python3 codex_radar.py --cache .local/cache/codex_radar_snapshot.json --force
+python3 codex_claude_usage_web.py --cache-dir .local/cache
 ```
 
 Restart the service after upgrading the code. No separate scheduler is required.

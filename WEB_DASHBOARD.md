@@ -8,7 +8,7 @@
 python3 codex_claude_usage_web.py --help
 python3 codex_claude_usage_web.py --sources all --refresh 30 --quiet
 python3 codex_claude_usage_web.py --sources claude --default-report claude-usage
-python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache --check
+python3 codex_claude_usage_web.py --cache-dir .local/cache --check
 ```
 
 | Option | Meaning / 作用 |
@@ -28,9 +28,16 @@ python3 codex_claude_usage_web.py --cache-dir /tmp/codex-usage-cache --check
 | `--cache-seconds` | Whole-report reuse window, default 5 seconds; per-source caches remain independent |
 
 The page URL can override the default view with `?report=claude-usage` after
-sign-in. Disabled sources return `disabled: true` and never run collectors.
+opening the authenticated startup URL. Disabled sources return `disabled: true` and never run collectors.
 Account token-history/profile and Admin API reports remain disabled. Reset Credits alone have a read-only Codex-client exception.
-Browser language and time range are saved locally.
+The interface starts in English unless a valid saved language preference exists.
+Choose Simplified Chinese from Language on either the dashboard or maintenance
+page. Language and time range are stored locally for the current origin; a
+different fallback port starts with that origin's saved settings or the defaults.
+Source detection runs on server startup; restart after installing a new client.
+
+界面默认英文，可在首页或维护页的 Language 菜单选择简体中文。语言和时间范围保存在
+当前本地地址下；端口变化时，会使用新地址已有的设置或默认值。
 
 首次认证后可用 `?report=claude-usage` 指定视图。关闭的来源不会执行采集。
 默认自动检测的结果在重启服务时更新；安装或登录新客户端后请重启。
@@ -69,8 +76,14 @@ renders a late response for the old selection.
 | Isambard | 30-second source cache over a 5-minute disk cache |
 | Radar | Independent 4-hour worker; one homepage request, up to 3 attempts for transient errors |
 
+Manual Refresh bypasses only the Isambard cache, at most once per 30 seconds.
+It does not bypass the Reset Credits cache, refresh Radar upstream, or create a
+Claude quota snapshot. The selected range filters all local token breakdowns
+by local calendar date, including today. Unknown dates are included only in
+All local history and are disclosed separately. See [accounting details](docs/local-usage.md).
+
 网页同时最多加载两个区块，逐块显示结果。刷新间隔控制读取频率，各来源仍使用自己的缓存。
-手动刷新仅对 Isambard 绕过缓存，30 秒内最多启动一次；不会强制刷新 Radar 或 Claude 限额。
+手动刷新仅对 Isambard 绕过缓存，30 秒内最多启动一次；不会绕过 Reset Credits 缓存，也不会强制刷新 Radar 或生成 Claude 限额快照。
 `range` 同时筛选总量、模型、项目、会话和图表，包含今天，按本地日历日计算。日期未知的用量仅计入全部历史，并单独提示。参见 [统计说明](docs/local-usage.md)。
 
 ## Paths and environment / 路径与环境变量
@@ -80,22 +93,23 @@ renders a late response for the old selection.
 | `PULSEDECK_RESET_CREDITS_ONLINE` | Defaults to `1`; set `0` to disable Reset Credits lookup |
 | `CODEX_HOME` | Codex state directory; default `~/.codex` |
 | `CLAUDE_CONFIG_DIR` | Claude state directory; default `~/.claude` |
-| `CLAUDE_BIN` | Explicit Claude launcher for auth checks and the refresher |
+| `CLAUDE_BIN` | Client discovery and the optional standalone refresher; no automatic auth check |
 | `CLAUDE_USAGE_PROJECT_DIR` | Temporary refresher session's project |
 | `CLAUDE_USAGE_SNAPSHOT` | Claude limit snapshot; default `~/.claude/usage-dashboard.json` |
 | `CLAUDE_USAGE_STALE_SECONDS` | Snapshot stale threshold; default 900 seconds |
-| `CODEX_USAGE_CACHE_DIR` | Public caches; overridden by `--cache-dir` |
+| `PULSEDECK_CACHE_DIR` | Public cache directory; overridden by `--cache-dir` |
+| `CODEX_USAGE_CACHE_DIR` | Legacy fallback when `PULSEDECK_CACHE_DIR` is unset |
 | `CODEX_USAGE_EXPORT_DIR` | CLI export directory; overridden by `export --output-dir` |
 | `SSL_CERT_FILE` | CA bundle override for public status/benchmark requests |
-| `OPENAI_ADMIN_KEY` | Optional organization usage/cost API; not needed for subscriptions |
+| `OPENAI_ADMIN_KEY` | Legacy setting; Admin API collection remains disabled even when set |
 
 Default public cache locations:
 
-- macOS: `~/Library/Caches/codex-usage`
-- Linux: `$XDG_CACHE_HOME/codex-usage`, or `~/.cache/codex-usage`
-- Windows: `%LOCALAPPDATA%/codex-usage`
+- macOS: `~/Library/Caches/pulsedeck`
+- Linux: `$XDG_CACHE_HOME/pulsedeck`, or `~/.cache/pulsedeck`
+- Windows: `%LOCALAPPDATA%/PulseDeck/cache`
 
-Exports default to `~/Downloads/codex-usage`:
+Exports default to `~/Downloads/PulseDeck`:
 
 ```sh
 python3 codex_usage.py export --report local-usage --format json --output-dir ./exports
@@ -103,7 +117,8 @@ python3 codex_usage.py export --report local-usage --format json --output-dir ./
 
 Earlier repository-local public caches are read as a fallback when the new
 default cache file is absent. New writes use the user cache directory; existing
-files are not deleted. Custom cache directories do not read legacy caches.
+files are not deleted. Custom cache directories do not read legacy caches. A
+cache-write failure does not discard a successful live result.
 缓存写入失败不会丢弃已抓取的数据。旧仓库缓存仅作为默认路径的回退读取，原文件不会被删除。
 
 ## Local HTTP API / 本地接口
