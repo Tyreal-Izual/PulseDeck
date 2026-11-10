@@ -4,8 +4,10 @@
 
 Radar is enabled by default; use its toolbar checkbox to pause/resume collection.
 `codex_radar.py` owns collection and caching; `static/radar.js` and `static/radar.css`
-render the cards. Radar is a collapsed section below the usage cards on the
-overview and Codex pages. It also works when Radar is the only enabled source.
+render the cards. Radar is displayed directly below the standalone Reset Credits
+panel on the overview and Codex pages, without an outer collapse control. The
+optional full-data table can still be expanded separately. Radar also works when
+it is the only enabled source.
 
 ## Current source and display
 

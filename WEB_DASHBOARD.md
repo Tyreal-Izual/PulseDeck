@@ -48,7 +48,10 @@ collection work; Radar's background worker pauses. An already-running fetch may 
 The switches are shared by this server's tabs, synchronized on refresh, and reset to the startup
 selection when the server restarts. Explicit `--sources` selections determine initial checkboxes.
 
-工具栏支持统一时间筛选，默认近 30 天。首页显示两张用量卡片；Radar 详情默认折叠。关闭来源不会删除缓存。
+Reset Credits has its own panel immediately above Radar. Radar scores are shown
+without expanding a section.
+
+工具栏支持统一时间筛选，默认近 30 天。Reset Credits 独立放在 Radar 上方；Radar 评分直接显示。关闭来源不会删除缓存。
 
 Radar displays only **homepage degradation score cards**, grouped by model. Each
 card shows a two-decimal score and a thin bar scaled to **score / 150**. History

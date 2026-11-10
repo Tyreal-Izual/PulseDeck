@@ -3,8 +3,9 @@
 [English](radar.md) · [中文快速开始](../README.zh-CN.md)
 
 Radar 默认启用，可通过工具栏复选框暂停或恢复采集。`codex_radar.py` 负责采集与缓存，
-`static/radar.js` 和 `static/radar.css` 负责卡片展示。Radar 默认折叠在总览和 Codex
-页面的用量卡片下方，也支持只启用 Radar 来源。
+`static/radar.js` 和 `static/radar.css` 负责卡片展示。总览和 Codex 页面中的 Radar
+直接显示在独立的 Reset Credits 模块下方，不再整体折叠；完整数据表仍可单独展开。
+也支持只启用 Radar 来源。
 
 ## 当前数据源与展示
 

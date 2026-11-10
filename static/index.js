@@ -19,7 +19,6 @@ __PREFERENCES_SCRIPT__
 
     const TEXT = {
       en: {
-        moduleScores: "Model scores",
         appTitle: "PulseDeck",
         subtitle: "Local usage, service status, and model intelligence.",
         sourceDisabled: "Not enabled",
@@ -103,7 +102,6 @@ __PREFERENCES_SCRIPT__
         unknown: "Unknown"
       },
       zh: {
-        moduleScores: "模型评测",
         appTitle: "PulseDeck",
         subtitle: "本地 AI 用量、服务状态和模型评测。",
         sourceDisabled: "未启用",
@@ -663,11 +661,12 @@ __USAGE_SCRIPT__
         ? panel(CodexRadar.title(state.lang), CodexRadar.subtitle(state.lang), '<div id="codex-radar"></div>', true, "codex-radar-panel",
             [{label:t("updated"),valueHtml:'<span data-radar-age>—</span>'}]) : null;
       const panels = [
-        ...renderCodexQuota(sections.local, sections.resets), ...renderClaudeQuota(sections.claude),
+        ...renderCodexQuota(sections.local), ...renderClaudeQuota(sections.claude),
         ...renderIsambard(sections.isambard), ...loadingPanels.filter(p => p.title === "loading-isambard_status"),
         ...renderLocal(sections.local, overview), ...renderUsage(sections.claude?.local_usage, "claude", overview),
         ...loadingPanels.filter(p => p.title !== "loading-isambard_status"), ...disabledPanels,
-        collapsePanel(radar, "radar-details", "Radar · " + t("moduleScores"))
+        ...(["all", "codex-usage"].includes(report) && dashboardConfig.sources.includes("codex") ? renderResetCredits(sections.resets) : []),
+        radar
       ];
       const expanded = new Set([...document.querySelectorAll("[data-disclosure][open]")].map(node => node.dataset.disclosure));
       const radarRoot = document.getElementById("codex-radar");
@@ -702,8 +701,6 @@ __USAGE_SCRIPT__
         if (!state.lastPayload?.pending?.length) state.initialPanelPositionPending = false;
         return;
       }
-      const disclosure = target.closest("details");
-      if (disclosure) disclosure.open = true;
       requestAnimationFrame(() => {
         if (!state.initialPanelPositionPending || !target.isConnected) return;
         target.scrollIntoView({block: "start", behavior: "instant"});

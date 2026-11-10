@@ -1,2 +1,2 @@
 """PulseDeck: local usage, infrastructure and model intelligence."""
-__version__ = "0.4.9"
+__version__ = "0.4.10"

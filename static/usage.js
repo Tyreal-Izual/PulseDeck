@@ -128,11 +128,6 @@ function renderUsage(usage, source, overview = false) {
   ];
 }
 
-function collapsePanel(item, id, label) {
-  if (!item) return null;
-  return {title:id, wide:true, html:`<details class="collapsed-panel" data-disclosure="${id}"><summary>${esc(label)}</summary>${item.html}</details>`};
-}
-
 function limitLeft(usedValue) {
   if (usedValue == null || usedValue === "" || typeof usedValue === "boolean") return null;
   const used = asNumber(usedValue);
@@ -233,19 +228,24 @@ function resetCreditsMarkup(resets) {
   const details = rows.length ? `<details class="data-notes" data-disclosure="reset-credit-details"><summary>${esc(t("resetDetails"))} (${rows.length})</summary>
     ${table([t("resetStatusAtRead"),t("resetGranted"),t("resetExpires"),t("resetTimeLeft")],rows)}<p>${esc(t("resetDetailHint"))}</p></details>` : "";
   const note = unavailable && unavailable !== "resetDisabled" ? t(unavailable) : !unavailable && resets.available_count > 0 && !rows.length ? t("resetNoDetails") : "";
-  return `<div class="reset-credits"><div class="reset-credit-heading"><strong>${esc(t("resetCredits"))}</strong>
-    <span>${esc(t("resetAvailable"))} <b>${count}</b></span><span class="reset-credit-meta">${esc(t(unavailable === "resetDisabled" ? "resetDisabled" : "resetReadOnly"))}</span>${updated}</div>
+  return `<div class="reset-credits"><div class="reset-credit-heading">
+    <span>${esc(t("resetAvailable"))} <b>${count}</b></span>${updated}</div>
     ${note ? `<p class="subtle">${esc(note)}</p>` : ""}${details}</div>`;
 }
 
-function renderCodexQuota(local, resets) {
-  if (!local?.rate_limits && (!resets || resets.disabled)) return [];
-  const rate = local?.rate_limits || {};
+function renderResetCredits(resets) {
+  return [panel(t("resetCredits"), t(resets?.disabled ? "resetDisabled" : "resetReadOnly"),
+    resetCreditsMarkup(resets), true, "codex-resets")];
+}
+
+function renderCodexQuota(local) {
+  const rate = local?.rate_limits;
+  if (!rate) return [];
   const extras = [
     {label:t("updated"), valueHtml:quotaAgeMarkup(rate)},
     {label:t("status"), valueHtml:quotaStateMarkup(rate)},
     ...(rate.plan_type ? [{label:t("plan"), value:rate.plan_type}] : [])
   ];
   const bars = `<div class="bars quota-bars">${quotaBar("codex", "five_hour", rate.five_hour, t("claudeFiveHour"))}${quotaBar("codex", "seven_day", rate.seven_day, t("claudeWeekly"))}</div>`;
-  return [panel(t("codexQuota"), t("quotaLocal"), bars + resetCreditsMarkup(resets), true, "codex-rate", extras)];
+  return [panel(t("codexQuota"), t("quotaLocal"), bars, true, "codex-rate", extras)];
 }
